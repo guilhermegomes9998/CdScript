@@ -1,0 +1,1694 @@
+-- Script Lua otimizado para Roblox com GUI avançada, exploits funcionais e design fluido
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local LocalPlayer = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
+
+-- Tabelas e configurações
+local ESPBillboards = {}
+local Waypoints = {}
+local PathRecording = { Recording = false, Path = {} }
+local Config = { 
+    ESPColor = Color3.fromRGB(255, 255, 255), 
+    FontSize = 12, 
+    Theme = { 
+        Primary = Color3.fromRGB(20, 20, 80), 
+        Secondary = Color3.fromRGB(50, 50, 170), 
+        Border = Color3.fromRGB(255, 255, 255) 
+    } 
+}
+local ESPConfig = { 
+    Enabled = true, 
+    ShowHealth = true, 
+    ShowDistance = true, 
+    MaxDistance = 1000, 
+    OnlyVisible = false, 
+    FilterByTeam = false, 
+    FilterByFriends = false, 
+    OutlineEnabled = true, 
+    HitboxEnabled = false 
+}
+local aimbotEnabled = false
+local speedHackEnabled = false
+local noclipEnabled = false
+local flyEnabled = false
+local infiniteJumpEnabled = false
+local wallWalkEnabled = false
+local wallTPEnabled = false
+local xrayEnabled = false
+local invisibleEnabled = false
+local reduceHitboxEnabled = false
+local flingAuraEnabled = false
+local killAuraEnabled = false
+local guiMinimized = false
+local speedValue = 16
+local spectatingPlayer = nil
+local flingAuraRadius = 20
+local killAuraRadius = 10
+local originalSizes = {} -- Armazena tamanhos originais para ReduceHitbox
+
+-- Função de debug
+local function debugLog(message)
+    print("[ArchonNexus Debug] " .. message)
+end
+
+-- Função para notificação na tela
+local function showNotification(message)
+    local notification = Instance.new("TextLabel")
+    notification.Size = UDim2.new(0, 200, 0, 50)
+    notification.Position = UDim2.new(0.5, -100, 0, 50)
+    notification.BackgroundColor3 = Config.Theme.Primary
+    notification.TextColor3 = Color3.new(1, 1, 1)
+    notification.Text = message
+    notification.Font = Enum.Font.Gotham
+    notification.TextSize = 12
+    notification.TextWrapped = true
+    notification.Parent = game.Players.LocalPlayer.PlayerGui:FindFirstChild("EnhancedGUI")
+    local corner = Instance.new("UICorner", notification)
+    corner.CornerRadius = UDim.new(0, 8)
+    local stroke = Instance.new("UIStroke", notification)
+    stroke.Color = Config.Theme.Border
+    stroke.Thickness = 2
+    local tween = TweenService:Create(notification, TweenInfo.new(0.5, Enum.EasingStyle.Quad), {BackgroundTransparency = 0})
+    tween:Play()
+    task.spawn(function()
+        wait(3)
+        TweenService:Create(notification, TweenInfo.new(0.5, Enum.EasingStyle.Quad), {BackgroundTransparency = 1, TextTransparency = 1}):Play()
+        wait(0.5)
+        notification:Destroy()
+    end)
+end
+
+-- Função para teleportar
+local function teleportTo(target)
+    local rootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then
+        debugLog("Falha no teleporte: Personagem local não encontrado")
+        showNotification("Erro: Personagem não carregado")
+        return false, "Erro: Seu personagem não está carregado"
+    end
+    if typeof(target) == "CFrame" then
+        rootPart.CFrame = target * CFrame.new(0, 0, -2)
+        return true, "Teleportado para waypoint"
+    elseif typeof(target) == "Instance" and target:IsA("Player") and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+        rootPart.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, -2)
+        return true, "Teleportado para " .. target.Name
+    end
+    debugLog("Falha no teleporte: Destino inválido")
+    showNotification("Falha no teleporte")
+    return false, "Falha no teleporte: destino inválido"
+end
+
+-- Função para criar ESP para jogadores
+local function createESP(player)
+    if player == LocalPlayer then
+        debugLog("Ignorando ESP para o jogador local: " .. player.Name)
+        return
+    end
+    local function setupESP(character)
+        local success, head = pcall(function()
+            return character:WaitForChild("Head", 5)
+        end)
+        local humanoid = character:WaitForChild("Humanoid", 5)
+        if not success or not head or not humanoid then
+            debugLog("Falha ao criar ESP para " .. player.Name .. ": Head ou Humanoid não encontrado")
+            return
+        end
+        local billboard = Instance.new("BillboardGui")
+        billboard.Name = "ESP"
+        billboard.Adornee = head
+        billboard.Size = UDim2.new(0, 200, 0, 80)
+        billboard.StudsOffset = Vector3.new(0, 3, 0)
+        billboard.AlwaysOnTop = not ESPConfig.OnlyVisible
+        billboard.Parent = head
+
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Text = player.Name
+        nameLabel.Size = UDim2.new(1, 0, 0, 30)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.TextColor3 = Config.ESPColor
+        nameLabel.TextStrokeTransparency = 0.5
+        nameLabel.Font = Enum.Font.GothamBold
+        nameLabel.TextSize = Config.FontSize
+        nameLabel.Parent = billboard
+
+        local healthLabel = Instance.new("TextLabel")
+        healthLabel.Text = ""
+        healthLabel.Size = UDim2.new(1, 0, 0, 25)
+        healthLabel.Position = UDim2.new(0, 0, 0, 30)
+        healthLabel.BackgroundTransparency = 1
+        healthLabel.TextColor3 = Color3.new(0, 1, 0)
+        healthLabel.Font = Enum.Font.Gotham
+        healthLabel.TextSize = Config.FontSize - 2
+        healthLabel.Parent = billboard
+
+        local distanceLabel = Instance.new("TextLabel")
+        distanceLabel.Text = ""
+        distanceLabel.Size = UDim2.new(1, 0, 0, 25)
+        distanceLabel.Position = UDim2.new(0, 0, 0, 55)
+        distanceLabel.BackgroundTransparency = 1
+        distanceLabel.TextColor3 = Color3.new(1, 1, 0)
+        distanceLabel.Font = Enum.Font.Gotham
+        distanceLabel.TextSize = Config.FontSize - 2
+        distanceLabel.Parent = billboard
+
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "ESPHighlight"
+        highlight.Adornee = character
+        highlight.FillTransparency = 1
+        highlight.OutlineColor = Config.ESPColor
+        highlight.OutlineTransparency = ESPConfig.OutlineEnabled and 0.5 or 1
+        highlight.Parent = character
+
+        local hitboxHighlight = Instance.new("Highlight")
+        hitboxHighlight.Name = "HitboxHighlight"
+        hitboxHighlight.Adornee = character:FindFirstChild("HumanoidRootPart")
+        hitboxHighlight.FillColor = Color3.fromRGB(255, 0, 0)
+        hitboxHighlight.FillTransparency = 0.7
+        hitboxHighlight.OutlineTransparency = 1
+        hitboxHighlight.Enabled = ESPConfig.HitboxEnabled
+        hitboxHighlight.Parent = character
+
+        ESPBillboards[player] = { Billboard = billboard, HealthLabel = healthLabel, DistanceLabel = distanceLabel, Highlight = highlight, HitboxHighlight = hitboxHighlight }
+
+        local connection
+        connection = RunService.Heartbeat:Connect(function()
+            if not character or not humanoid or not billboard.Parent then
+                debugLog("Desconectando ESP para " .. player.Name)
+                connection:Disconnect()
+                billboard:Destroy()
+                highlight:Destroy()
+                hitboxHighlight:Destroy()
+                ESPBillboards[player] = nil
+                return
+            end
+            local success, distance = pcall(function()
+                return LocalPlayer:DistanceFromCharacter(head.Position)
+            end)
+            if not success then
+                debugLog("Erro ao calcular distância para " .. player.Name)
+                return
+            end
+            local shouldShow = ESPConfig.Enabled and (distance <= ESPConfig.MaxDistance or ESPConfig.MaxDistance == 0)
+            if ESPConfig.FilterByTeam and player.Team == LocalPlayer.Team then shouldShow = false end
+            if ESPConfig.FilterByFriends and not player:IsFriendsWith(LocalPlayer.UserId) then shouldShow = false end
+            billboard.Enabled = shouldShow
+            highlight.Enabled = shouldShow and ESPConfig.OutlineEnabled
+            hitboxHighlight.Enabled = shouldShow and ESPConfig.HitboxEnabled
+            if shouldShow then
+                if ESPConfig.ShowHealth then
+                    healthLabel.Text = "Saúde: " .. math.floor(humanoid.Health) .. "/" .. humanoid.MaxHealth
+                    healthLabel.TextColor3 = Color3.fromRGB(255 * (1 - humanoid.Health / humanoid.MaxHealth), 255 * (humanoid.Health / humanoid.MaxHealth), 0)
+                else
+                    healthLabel.Text = ""
+                end
+                if ESPConfig.ShowDistance then
+                    distanceLabel.Text = "Distância: " .. math.floor(distance) .. " studs"
+                else
+                    distanceLabel.Text = ""
+                end
+            end
+        end)
+    end
+    if player.Character then
+        setupESP(player.Character)
+    end
+    player.CharacterAdded:Connect(setupESP)
+end
+
+-- Funções para Tools
+local function createTeleportTool()
+    local tool = Instance.new("Tool")
+    tool.Name = "TeleportTool"
+    tool.RequiresHandle = false
+    tool.Parent = LocalPlayer.Backpack
+    tool.Activated:Connect(function()
+        local mouse = LocalPlayer:GetMouse()
+        if mouse.Hit then
+            local success, message = teleportTo(CFrame.new(mouse.Hit.Position + Vector3.new(0, 3, 0)))
+            if success then showNotification(message) end
+        end
+    end)
+    debugLog("Teleport Tool criado")
+    showNotification("Teleport Tool adicionado ao inventário")
+end
+
+local function createInvisibilityCloakTool()
+    local tool = Instance.new("Tool")
+    tool.Name = "InvisibilityCloak"
+    tool.RequiresHandle = false
+    tool.Parent = LocalPlayer.Backpack
+    tool.Activated:Connect(function()
+        invisibleEnabled = not invisibleEnabled
+        applyInvisible()
+        showNotification("Invisibilidade " .. (invisibleEnabled and "ativada" or "desativada"))
+    end)
+    debugLog("Invisibility Cloak criado")
+    showNotification("Invisibility Cloak adicionado ao inventário")
+end
+
+local function createHealthRegenTool()
+    local tool = Instance.new("Tool")
+    tool.Name = "HealthRegen"
+    tool.RequiresHandle = false
+    tool.Parent = LocalPlayer.Backpack
+    tool.Activated:Connect(function()
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            local humanoid = LocalPlayer.Character.Humanoid
+            humanoid.Health = humanoid.MaxHealth
+            showNotification("Saúde regenerada completamente")
+        else
+            showNotification("Erro: Personagem não carregado")
+        end
+    end)
+    debugLog("Health Regen Tool criado")
+    showNotification("Health Regen Tool adicionado ao inventário")
+end
+
+local function createCollectAllTool()
+    local tool = Instance.new("Tool")
+    tool.Name = "CollectAllTool"
+    tool.RequiresHandle = false
+    tool.Parent = LocalPlayer.Backpack
+    tool.Activated:Connect(function()
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            collectAllExploit()
+        else
+            showNotification("Erro: Personagem não carregado")
+        end
+    end)
+    debugLog("Collect All Tool criado")
+    showNotification("Collect All Tool adicionado ao inventário")
+end
+
+-- Funções de exploit
+local function applyNoclip(character)
+    if not character then return end
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = not noclipEnabled
+        end
+    end
+end
+
+local function toggleFly()
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+    local rootPart = LocalPlayer.Character.HumanoidRootPart
+    if flyEnabled then
+        local bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.Name = "FlyVelocity"
+        bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+        bodyVelocity.Parent = rootPart
+        local bodyGyro = Instance.new("BodyGyro")
+        bodyGyro.Name = "FlyGyro"
+        bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+        bodyGyro.P = 10000
+        bodyGyro.Parent = rootPart
+    else
+        if rootPart:FindFirstChild("FlyVelocity") then
+            rootPart.FlyVelocity:Destroy()
+        end
+        if rootPart:FindFirstChild("FlyGyro") then
+            rootPart.FlyGyro:Destroy()
+        end
+    end
+end
+
+local function applyInvisible()
+    if not LocalPlayer.Character then return end
+    for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.LocalTransparencyModifier = invisibleEnabled and 1 or 0
+        elseif part:IsA("Decal") then
+            part.Transparency = invisibleEnabled and 1 or 0
+        end
+    end
+end
+
+local function applyXray()
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj ~= LocalPlayer.Character and (obj:IsA("BasePart") or obj:IsA("MeshPart")) then
+            obj.LocalTransparencyModifier = xrayEnabled and 0.7 or 0
+        end
+    end
+end
+
+local function applySpeedHack()
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Humanoid") then return end
+    local humanoid = LocalPlayer.Character.Humanoid
+    humanoid.WalkSpeed = speedHackEnabled and speedValue or 16
+end
+
+local function applyWallWalk(character)
+    if not character or not character:FindFirstChild("HumanoidRootPart") or not character:FindFirstChild("Humanoid") then return end
+    local rootPart = character.HumanoidRootPart
+    local humanoid = character.Humanoid
+    if wallWalkEnabled then
+        local rayOrigin = rootPart.Position
+        local rayDirection = rootPart.CFrame.RightVector * 3
+        local rayParams = RaycastParams.new()
+        rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+        local rayResult = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
+        if rayResult and rayResult.Instance and rayResult.Instance.CanCollide then
+            local bodyGyro = rootPart:FindFirstChild("WallWalkGyro") or Instance.new("BodyGyro")
+            bodyGyro.Name = "WallWalkGyro"
+            bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+            bodyGyro.P = 10000
+            bodyGyro.CFrame = CFrame.new(Vector3.new(0, 0, 0), rayResult.Normal)
+            bodyGyro.Parent = rootPart
+            humanoid.PlatformStand = true
+        else
+            if rootPart:FindFirstChild("WallWalkGyro") then
+                rootPart.WallWalkGyro:Destroy()
+            end
+            humanoid.PlatformStand = false
+        end
+    else
+        if rootPart:FindFirstChild("WallWalkGyro") then
+            rootPart.WallWalkGyro:Destroy()
+        end
+        humanoid.PlatformStand = false
+    end
+end
+
+local function wallTP()
+    if not wallTPEnabled or not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+    local rootPart = LocalPlayer.Character.HumanoidRootPart
+    local rayOrigin = rootPart.Position
+    local rayDirection = rootPart.CFrame.LookVector * 5
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    local rayResult = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
+    if rayResult and rayResult.Instance and rayResult.Instance.CanCollide then
+        local topPosition = rayResult.Position + Vector3.new(0, rayResult.Instance.Size.Y / 2 + LocalPlayer.Character.Humanoid.HipHeight + 2, 0)
+        local success, message = teleportTo(CFrame.new(topPosition))
+        if success then
+            debugLog("Teleportado para o topo da parede")
+            showNotification("Teleportado para o topo da parede")
+        end
+    end
+end
+
+local function applyReduceHitbox(character)
+    if not character then return end
+    if reduceHitboxEnabled then
+        for _, part in pairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                if not originalSizes[part] then
+                    originalSizes[part] = part.Size
+                end
+                if part.Name == "HumanoidRootPart" then
+                    part.Size = Vector3.new(0.5, 0.5, 0.5)
+                else
+                    part.Size = originalSizes[part] * 0.1
+                end
+            end
+        end
+    else
+        for _, part in pairs(character:GetDescendants()) do
+            if part:IsA("BasePart") and originalSizes[part] then
+                part.Size = originalSizes[part]
+            end
+        end
+    end
+end
+
+local function fling()
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        showNotification("Erro: Personagem não carregado")
+        return
+    end
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            local targetRoot = player.Character.HumanoidRootPart
+            local bodyVelocity = Instance.new("BodyVelocity")
+            bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            bodyVelocity.Velocity = Vector3.new(0, 500, 0)
+            bodyVelocity.Parent = targetRoot
+            task.spawn(function()
+                wait(0.1)
+                bodyVelocity:Destroy()
+            end)
+        end
+    end
+    showNotification("Fling ativado")
+end
+
+local function flingAura()
+    if not flingAuraEnabled or not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+    local rootPart = LocalPlayer.Character.HumanoidRootPart
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            local targetRoot = player.Character.HumanoidRootPart
+            local distance = (rootPart.Position - targetRoot.Position).Magnitude
+            if distance <= flingAuraRadius then
+                local bodyVelocity = Instance.new("BodyVelocity")
+                bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                bodyVelocity.Velocity = Vector3.new(0, 500, 0)
+                bodyVelocity.Parent = targetRoot
+                task.spawn(function()
+                    wait(0.1)
+                    bodyVelocity:Destroy()
+                end)
+            end
+        end
+    end
+end
+
+local function killAura()
+    if not killAuraEnabled or not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+    local rootPart = LocalPlayer.Character.HumanoidRootPart
+    local equippedTool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            local targetRoot = player.Character.HumanoidRootPart
+            local targetHumanoid = player.Character.Humanoid
+            local distance = (rootPart.Position - targetRoot.Position).Magnitude
+            if distance <= killAuraRadius then
+                if equippedTool and equippedTool:FindFirstChild("Handle") then
+                    local clickDetector = equippedTool.Handle:FindFirstChildOfClass("ClickDetector")
+                    if clickDetector then
+                        fireclickdetector(clickDetector)
+                    end
+                end
+                pcall(function()
+                    targetHumanoid:TakeDamage(10)
+                end)
+            end
+        end
+    end
+end
+
+local function collectAllExploit()
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        showNotification("Erro: Personagem não carregado")
+        return
+    end
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if (obj:IsA("Tool") and obj.Parent ~= LocalPlayer.Backpack and obj.Parent ~= LocalPlayer.Character) or 
+           (obj:IsA("BasePart") and obj:FindFirstChildOfClass("ClickDetector") and not obj:IsDescendantOf(Workspace.Terrain)) then
+            pcall(function()
+                if obj:IsA("Tool") then
+                    obj.Parent = LocalPlayer.Backpack
+                elseif obj:FindFirstChildOfClass("ClickDetector") then
+                    fireclickdetector(obj:FindFirstChildOfClass("ClickDetector"))
+                end
+            end)
+        end
+    end
+    showNotification("Todos os itens coletáveis coletados")
+end
+
+local function spectatePlayer(player)
+    if not player or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+        showNotification("Erro: Jogador não válido para espectar")
+        return
+    end
+    spectatingPlayer = player
+    Workspace.CurrentCamera.CameraSubject = player.Character.Humanoid
+    showNotification("Espectando " .. player.Name)
+end
+
+local function stopSpectating()
+    if spectatingPlayer then
+        Workspace.CurrentCamera.CameraSubject = LocalPlayer.Character and LocalPlayer.Character.Humanoid or nil
+        showNotification("Espectação encerrada")
+        spectatingPlayer = nil
+    end
+end
+-- Criação da GUI
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 10)
+if not PlayerGui then
+    debugLog("Script abortado: PlayerGui não disponível")
+    return
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "EnhancedGUI"
+ScreenGui.Parent = PlayerGui
+ScreenGui.ResetOnSpawn = false
+debugLog("ScreenGui criado com sucesso")
+
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 400, 0, 300)
+MainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
+MainFrame.BackgroundColor3 = Config.Theme.Primary
+MainFrame.BorderSizePixel = 0
+local corner = Instance.new("UICorner", MainFrame)
+corner.CornerRadius = UDim.new(0, 10)
+local uiStroke = Instance.new("UIStroke", MainFrame)
+uiStroke.Color = Config.Theme.Border
+uiStroke.Thickness = 2
+
+local TitleBar = Instance.new("Frame", MainFrame)
+TitleBar.Size = UDim2.new(1, 0, 0, 30)
+TitleBar.BackgroundColor3 = Config.Theme.Secondary
+local titleCorner = Instance.new("UICorner", TitleBar)
+titleCorner.CornerRadius = UDim.new(0, 10)
+
+local TitleLabel = Instance.new("TextLabel", TitleBar)
+TitleLabel.Text = "Archon Nexus GUI"
+TitleLabel.Size = UDim2.new(0, 200, 1, 0)
+TitleLabel.Position = UDim2.new(0, 10, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.TextColor3 = Color3.new(1, 1, 1)
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextSize = 14
+
+local MinimizeButton = Instance.new("TextButton", TitleBar)
+MinimizeButton.Text = "-"
+MinimizeButton.Size = UDim2.new(0, 30, 0, 30)
+MinimizeButton.Position = UDim2.new(1, -40, 0, 0)
+MinimizeButton.BackgroundColor3 = Config.Theme.Secondary
+MinimizeButton.TextColor3 = Color3.new(1, 1, 1)
+MinimizeButton.Font = Enum.Font.Gotham
+MinimizeButton.TextSize = 14
+local minimizeCorner = Instance.new("UICorner", MinimizeButton)
+minimizeCorner.CornerRadius = UDim.new(0, 8)
+local minimizeStroke = Instance.new("UIStroke", MinimizeButton)
+minimizeStroke.Color = Config.Theme.Border
+minimizeStroke.Thickness = 2
+
+local RestoreButton = Instance.new("TextButton", ScreenGui)
+RestoreButton.Text = "+"
+RestoreButton.Size = UDim2.new(0, 50, 0, 50)
+RestoreButton.Position = UDim2.new(1, -60, 1, -60)
+RestoreButton.BackgroundColor3 = Config.Theme.Secondary
+RestoreButton.TextColor3 = Color3.new(1, 1, 1)
+RestoreButton.Font = Enum.Font.Gotham
+RestoreButton.TextSize = 18
+RestoreButton.Visible = false
+local restoreCorner = Instance.new("UICorner", RestoreButton)
+restoreCorner.CornerRadius = UDim.new(0, 10)
+local restoreStroke = Instance.new("UIStroke", RestoreButton)
+restoreStroke.Color = Config.Theme.Border
+restoreStroke.Thickness = 2
+
+-- Abas
+local TabFrame = Instance.new("Frame", MainFrame)
+TabFrame.Size = UDim2.new(1, 0, 0, 40)
+TabFrame.Position = UDim2.new(0, 0, 0, 30)
+TabFrame.BackgroundColor3 = Config.Theme.Secondary
+local tabCorner = Instance.new("UICorner", TabFrame)
+tabCorner.CornerRadius = UDim.new(0, 10)
+
+local tabs = {"ESP", "Waypoints", "Teleporte", "Aimbot", "Reverse", "Exploits", "Tools"}
+local pages = {}
+for i, tabName in ipairs(tabs) do
+    local TabButton = Instance.new("TextButton", TabFrame)
+    TabButton.Text = tabName
+    TabButton.Size = UDim2.new(0.143, 0, 1, 0)
+    TabButton.Position = UDim2.new((i-1)*0.143, 0, 0, 0)
+    TabButton.BackgroundColor3 = Config.Theme.Secondary
+    TabButton.TextColor3 = Color3.new(1, 1, 1)
+    TabButton.Font = Enum.Font.Gotham
+    TabButton.TextSize = 12
+    local tabCorner = Instance.new("UICorner", TabButton)
+    tabCorner.CornerRadius = UDim.new(0, 8)
+    local tabStroke = Instance.new("UIStroke", TabButton)
+    tabStroke.Color = Config.Theme.Border
+    tabStroke.Thickness = 2
+
+    local Page = Instance.new("Frame", MainFrame)
+    Page.Name = tabName .. "Page"
+    Page.Size = UDim2.new(1, 0, 1, -70)
+    Page.Position = UDim2.new(0, 0, 0, 70)
+    Page.BackgroundTransparency = 1
+    Page.Visible = (i == 1)
+    pages[tabName] = Page
+
+    local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    TabButton.MouseEnter:Connect(function()
+        TweenService:Create(TabButton, tweenInfo, {BackgroundColor3 = Config.Theme.Secondary:Lerp(Color3.new(1, 1, 1), 0.1)}):Play()
+    end)
+    TabButton.MouseLeave:Connect(function()
+        TweenService:Create(TabButton, tweenInfo, {BackgroundColor3 = Config.Theme.Secondary}):Play()
+    end)
+    TabButton.MouseButton1Click:Connect(function()
+        for _, p in pairs(pages) do
+            p.Visible = false
+            TweenService:Create(p, tweenInfo, {BackgroundTransparency = 1}):Play()
+        end
+        Page.Visible = true
+        TweenService:Create(Page, tweenInfo, {BackgroundTransparency = 0}):Play()
+        TweenService:Create(TabButton, tweenInfo, {Size = UDim2.new(0.143, 0, 1, 5)}):Play()
+        task.spawn(function()
+            wait(0.1)
+            TweenService:Create(TabButton, tweenInfo, {Size = UDim2.new(0.143, 0, 1, 0)}):Play()
+        end)
+        debugLog("Aba " .. tabName .. " selecionada")
+        showNotification("Aba " .. tabName .. " selecionada")
+    end)
+end
+
+-- Aba ESP
+local ESPPage = pages["ESP"]
+local ESPToggle = Instance.new("TextButton", ESPPage)
+ESPToggle.Text = "Desativar ESP"
+ESPToggle.Size = UDim2.new(0, 150, 0, 30)
+ESPToggle.Position = UDim2.new(0, 20, 0, 20)
+ESPToggle.BackgroundColor3 = Config.Theme.Secondary
+ESPToggle.TextColor3 = Color3.new(1, 1, 1)
+ESPToggle.Font = Enum.Font.Gotham
+ESPToggle.TextSize = 12
+local espCorner = Instance.new("UICorner", ESPToggle)
+espCorner.CornerRadius = UDim.new(0, 8)
+local espStroke = Instance.new("UIStroke", ESPToggle)
+espStroke.Color = Config.Theme.Border
+espStroke.Thickness = 2
+
+local HealthToggle = Instance.new("TextButton", ESPPage)
+HealthToggle.Text = "Saúde: Ativado"
+HealthToggle.Size = UDim2.new(0, 150, 0, 30)
+HealthToggle.Position = UDim2.new(0, 180, 0, 20)
+HealthToggle.BackgroundColor3 = Config.Theme.Secondary
+HealthToggle.TextColor3 = Color3.new(1, 1, 1)
+HealthToggle.Font = Enum.Font.Gotham
+HealthToggle.TextSize = 12
+local healthCorner = Instance.new("UICorner", HealthToggle)
+healthCorner.CornerRadius = UDim.new(0, 8)
+local healthStroke = Instance.new("UIStroke", HealthToggle)
+healthStroke.Color = Config.Theme.Border
+healthStroke.Thickness = 2
+
+local DistanceToggle = Instance.new("TextButton", ESPPage)
+DistanceToggle.Text = "Distância: Ativado"
+DistanceToggle.Size = UDim2.new(0, 150, 0, 30)
+DistanceToggle.Position = UDim2.new(0, 20, 0, 60)
+DistanceToggle.BackgroundColor3 = Config.Theme.Secondary
+DistanceToggle.TextColor3 = Color3.new(1, 1, 1)
+DistanceToggle.Font = Enum.Font.Gotham
+DistanceToggle.TextSize = 12
+local distanceCorner = Instance.new("UICorner", DistanceToggle)
+distanceCorner.CornerRadius = UDim.new(0, 8)
+local distanceStroke = Instance.new("UIStroke", DistanceToggle)
+distanceStroke.Color = Config.Theme.Border
+distanceStroke.Thickness = 2
+
+local OutlineToggle = Instance.new("TextButton", ESPPage)
+OutlineToggle.Text = "Contorno: Ativado"
+OutlineToggle.Size = UDim2.new(0, 150, 0, 30)
+OutlineToggle.Position = UDim2.new(0, 180, 0, 60)
+OutlineToggle.BackgroundColor3 = Config.Theme.Secondary
+OutlineToggle.TextColor3 = Color3.new(1, 1, 1)
+OutlineToggle.Font = Enum.Font.Gotham
+OutlineToggle.TextSize = 12
+local outlineCorner = Instance.new("UICorner", OutlineToggle)
+outlineCorner.CornerRadius = UDim.new(0, 8)
+local outlineStroke = Instance.new("UIStroke", OutlineToggle)
+outlineStroke.Color = Config.Theme.Border
+outlineStroke.Thickness = 2
+
+local HitboxESPToggle = Instance.new("TextButton", ESPPage)
+HitboxESPToggle.Text = "Hitbox ESP: Desativado"
+HitboxESPToggle.Size = UDim2.new(0, 150, 0, 30)
+HitboxESPToggle.Position = UDim2.new(0, 20, 0, 100)
+HitboxESPToggle.BackgroundColor3 = Config.Theme.Secondary
+HitboxESPToggle.TextColor3 = Color3.new(1, 1, 1)
+HitboxESPToggle.Font = Enum.Font.Gotham
+HitboxESPToggle.TextSize = 12
+local hitboxCorner = Instance.new("UICorner", HitboxESPToggle)
+hitboxCorner.CornerRadius = UDim.new(0, 8)
+local hitboxStroke = Instance.new("UIStroke", HitboxESPToggle)
+hitboxStroke.Color = Config.Theme.Border
+hitboxStroke.Thickness = 2
+
+local FilterTeamToggle = Instance.new("TextButton", ESPPage)
+FilterTeamToggle.Text = "Filtrar Equipe: Desativado"
+FilterTeamToggle.Size = UDim2.new(0, 150, 0, 30)
+FilterTeamToggle.Position = UDim2.new(0, 180, 0, 100)
+FilterTeamToggle.BackgroundColor3 = Config.Theme.Secondary
+FilterTeamToggle.TextColor3 = Color3.new(1, 1, 1)
+FilterTeamToggle.Font = Enum.Font.Gotham
+FilterTeamToggle.TextSize = 12
+local teamCorner = Instance.new("UICorner", FilterTeamToggle)
+teamCorner.CornerRadius = UDim.new(0, 8)
+local teamStroke = Instance.new("UIStroke", FilterTeamToggle)
+teamStroke.Color = Config.Theme.Border
+teamStroke.Thickness = 2
+
+local FilterFriendsToggle = Instance.new("TextButton", ESPPage)
+FilterFriendsToggle.Text = "Filtrar Amigos: Desativado"
+FilterFriendsToggle.Size = UDim2.new(0, 150, 0, 30)
+FilterFriendsToggle.Position = UDim2.new(0, 20, 0, 140)
+FilterFriendsToggle.BackgroundColor3 = Config.Theme.Secondary
+FilterFriendsToggle.TextColor3 = Color3.new(1, 1, 1)
+FilterFriendsToggle.Font = Enum.Font.Gotham
+FilterFriendsToggle.TextSize = 12
+local friendsCorner = Instance.new("UICorner", FilterFriendsToggle)
+friendsCorner.CornerRadius = UDim.new(0, 8)
+local friendsStroke = Instance.new("UIStroke", FilterFriendsToggle)
+friendsStroke.Color = Config.Theme.Border
+friendsStroke.Thickness = 2
+
+-- Aba Waypoints
+local WaypointsPage = pages["Waypoints"]
+local WaypointList = Instance.new("ScrollingFrame", WaypointsPage)
+WaypointList.Size = UDim2.new(0, 360, 0, 170)
+WaypointList.Position = UDim2.new(0, 20, 0, 60)
+WaypointList.BackgroundColor3 = Config.Theme.Primary
+WaypointList.CanvasSize = UDim2.new(0, 0, 0, 0)
+WaypointList.ScrollBarThickness = 5
+local waypointListCorner = Instance.new("UICorner", WaypointList)
+waypointListCorner.CornerRadius = UDim.new(0, 8)
+local waypointListStroke = Instance.new("UIStroke", WaypointList)
+waypointListStroke.Color = Config.Theme.Border
+waypointListStroke.Thickness = 2
+
+local WaypointNameInput = Instance.new("TextBox", WaypointsPage)
+WaypointNameInput.Text = "Nome do waypoint"
+WaypointNameInput.Size = UDim2.new(0, 200, 0, 30)
+WaypointNameInput.Position = UDim2.new(0, 20, 0, 20)
+WaypointNameInput.BackgroundColor3 = Config.Theme.Primary
+WaypointNameInput.TextColor3 = Color3.new(1, 1, 1)
+WaypointNameInput.Font = Enum.Font.Gotham
+WaypointNameInput.TextSize = 12
+local waypointInputCorner = Instance.new("UICorner", WaypointNameInput)
+waypointInputCorner.CornerRadius = UDim.new(0, 8)
+local waypointInputStroke = Instance.new("UIStroke", WaypointNameInput)
+waypointInputStroke.Color = Config.Theme.Border
+waypointInputStroke.Thickness = 2
+
+local CreateWaypointButton = Instance.new("TextButton", WaypointsPage)
+CreateWaypointButton.Text = "Criar Waypoint"
+CreateWaypointButton.Size = UDim2.new(0, 150, 0, 30)
+CreateWaypointButton.Position = UDim2.new(0, 230, 0, 20)
+CreateWaypointButton.BackgroundColor3 = Config.Theme.Secondary
+CreateWaypointButton.TextColor3 = Color3.new(1, 1, 1)
+CreateWaypointButton.TextSize = 12
+local createWaypointCorner = Instance.new("UICorner", CreateWaypointButton)
+createWaypointCorner.CornerRadius = UDim.new(0, 8)
+local createWaypointStroke = Instance.new("UIStroke", CreateWaypointButton)
+createWaypointStroke.Color = Config.Theme.Border
+createWaypointStroke.Thickness = 2
+
+-- Aba Teleporte
+local TeleportPage = pages["Teleporte"]
+local PlayerList = Instance.new("ScrollingFrame", TeleportPage)
+PlayerList.Size = UDim2.new(0, 360, 0, 170)
+PlayerList.Position = UDim2.new(0, 20, 0, 60)
+PlayerList.BackgroundColor3 = Config.Theme.Primary
+PlayerList.CanvasSize = UDim2.new(0, 0, 0, 0)
+PlayerList.ScrollBarThickness = 5
+local playerListCorner = Instance.new("UICorner", PlayerList)
+playerListCorner.CornerRadius = UDim.new(0, 8)
+local playerListStroke = Instance.new("UIStroke", PlayerList)
+playerListStroke.Color = Config.Theme.Border
+playerListStroke.Thickness = 2
+local PlayerListLayout = Instance.new("UIListLayout", PlayerList)
+PlayerListLayout.Padding = UDim.new(0, 5)
+
+local TeleportInput = Instance.new("TextBox", TeleportPage)
+TeleportInput.Text = "Nome do jogador/waypoint"
+TeleportInput.Size = UDim2.new(0, 200, 0, 30)
+TeleportInput.Position = UDim2.new(0, 20, 0, 20)
+TeleportInput.BackgroundColor3 = Config.Theme.Primary
+TeleportInput.TextColor3 = Color3.new(1, 1, 1)
+TeleportInput.Font = Enum.Font.Gotham
+TeleportInput.TextSize = 12
+local teleportInputCorner = Instance.new("UICorner", TeleportInput)
+teleportInputCorner.CornerRadius = UDim.new(0, 8)
+local teleportInputStroke = Instance.new("UIStroke", TeleportInput)
+teleportInputStroke.Color = Config.Theme.Border
+teleportInputStroke.Thickness = 2
+
+local TeleportButton = Instance.new("TextButton", TeleportPage)
+TeleportButton.Text = "Teleportar"
+TeleportButton.Size = UDim2.new(0, 150, 0, 30)
+TeleportButton.Position = UDim2.new(0, 230, 0, 20)
+TeleportButton.BackgroundColor3 = Config.Theme.Secondary
+TeleportButton.TextColor3 = Color3.new(1, 1, 1)
+TeleportButton.Font = Enum.Font.Gotham
+TeleportButton.TextSize = 12
+local teleportButtonCorner = Instance.new("UICorner", TeleportButton)
+teleportButtonCorner.CornerRadius = UDim.new(0, 8)
+local teleportButtonStroke = Instance.new("UIStroke", TeleportButton)
+teleportButtonStroke.Color = Config.Theme.Border
+teleportButtonStroke.Thickness = 2
+
+-- Aba Aimbot
+local AimbotPage = pages["Aimbot"]
+local AimbotToggle = Instance.new("TextButton", AimbotPage)
+AimbotToggle.Text = "Ativar Aimbot"
+AimbotToggle.Size = UDim2.new(0, 150, 0, 30)
+AimbotToggle.Position = UDim2.new(0, 20, 0, 20)
+AimbotToggle.BackgroundColor3 = Config.Theme.Secondary
+AimbotToggle.TextColor3 = Color3.new(1, 1, 1)
+AimbotToggle.Font = Enum.Font.Gotham
+AimbotToggle.TextSize = 12
+local aimbotCorner = Instance.new("UICorner", AimbotToggle)
+aimbotCorner.CornerRadius = UDim.new(0, 8)
+local aimbotStroke = Instance.new("UIStroke", AimbotToggle)
+aimbotStroke.Color = Config.Theme.Border
+aimbotStroke.Thickness = 2
+
+local SmoothnessInput = Instance.new("TextBox", AimbotPage)
+SmoothnessInput.Text = "0.5"
+SmoothnessInput.Size = UDim2.new(0, 50, 0, 30)
+SmoothnessInput.Position = UDim2.new(0, 20, 0, 60)
+SmoothnessInput.BackgroundColor3 = Config.Theme.Primary
+SmoothnessInput.TextColor3 = Color3.new(1, 1, 1)
+SmoothnessInput.Font = Enum.Font.Gotham
+SmoothnessInput.TextSize = 12
+local smoothnessCorner = Instance.new("UICorner", SmoothnessInput)
+smoothnessCorner.CornerRadius = UDim.new(0, 8)
+local smoothnessStroke = Instance.new("UIStroke", SmoothnessInput)
+smoothnessStroke.Color = Config.Theme.Border
+smoothnessStroke.Thickness = 2
+
+local FOVInput = Instance.new("TextBox", AimbotPage)
+FOVInput.Text = "90"
+FOVInput.Size = UDim2.new(0, 50, 0, 30)
+FOVInput.Position = UDim2.new(0, 80, 0, 60)
+FOVInput.BackgroundColor3 = Config.Theme.Primary
+FOVInput.TextColor3 = Color3.new(1, 1, 1)
+FOVInput.Font = Enum.Font.Gotham
+FOVInput.TextSize = 12
+local fovCorner = Instance.new("UICorner", FOVInput)
+fovCorner.CornerRadius = UDim.new(0, 8)
+local fovStroke = Instance.new("UIStroke", FOVInput)
+fovStroke.Color = Config.Theme.Border
+fovStroke.Thickness = 2
+
+-- Aba Reverse
+local ReversePage = pages["Reverse"]
+local StartRecordingButton = Instance.new("TextButton", ReversePage)
+StartRecordingButton.Text = "Iniciar Gravação"
+StartRecordingButton.Size = UDim2.new(0, 150, 0, 30)
+StartRecordingButton.Position = UDim2.new(0, 20, 0, 20)
+StartRecordingButton.BackgroundColor3 = Config.Theme.Secondary
+StartRecordingButton.TextColor3 = Color3.new(1, 1, 1)
+StartRecordingButton.Font = Enum.Font.Gotham
+StartRecordingButton.TextSize = 12
+local startRecordingCorner = Instance.new("UICorner", StartRecordingButton)
+startRecordingCorner.CornerRadius = UDim.new(0, 8)
+local startRecordingStroke = Instance.new("UIStroke", StartRecordingButton)
+startRecordingStroke.Color = Config.Theme.Border
+startRecordingStroke.Thickness = 2
+
+local PlayReverseButton = Instance.new("TextButton", ReversePage)
+PlayReverseButton.Text = "Reproduzir Reverso"
+PlayReverseButton.Size = UDim2.new(0, 150, 0, 30)
+PlayReverseButton.Position = UDim2.new(0, 20, 0, 60)
+PlayReverseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+PlayReverseButton.TextColor3 = Color3.new(1, 1, 1)
+PlayReverseButton.Font = Enum.Font.Gotham
+PlayReverseButton.TextSize = 12
+local playReverseCorner = Instance.new("UICorner", PlayReverseButton)
+playReverseCorner.CornerRadius = UDim.new(0, 8)
+local playReverseStroke = Instance.new("UIStroke", PlayReverseButton)
+playReverseStroke.Color = Config.Theme.Border
+playReverseStroke.Thickness = 2
+
+-- Aba Exploits
+local ExploitsPage = pages["Exploits"]
+local SpeedHackToggle = Instance.new("TextButton", ExploitsPage)
+SpeedHackToggle.Text = "Speed Hack: Desativado"
+SpeedHackToggle.Size = UDim2.new(0, 150, 0, 30)
+SpeedHackToggle.Position = UDim2.new(0, 20, 0, 20)
+SpeedHackToggle.BackgroundColor3 = Config.Theme.Secondary
+SpeedHackToggle.TextColor3 = Color3.new(1, 1, 1)
+SpeedHackToggle.Font = Enum.Font.Gotham
+SpeedHackToggle.TextSize = 12
+local speedHackCorner = Instance.new("UICorner", SpeedHackToggle)
+speedHackCorner.CornerRadius = UDim.new(0, 8)
+local speedHackStroke = Instance.new("UIStroke", SpeedHackToggle)
+speedHackStroke.Color = Config.Theme.Border
+speedHackStroke.Thickness = 2
+
+local SpeedInput = Instance.new("TextBox", ExploitsPage)
+SpeedInput.Text = "16"
+SpeedInput.Size = UDim2.new(0, 50, 0, 30)
+SpeedInput.Position = UDim2.new(0, 180, 0, 20)
+SpeedInput.BackgroundColor3 = Config.Theme.Primary
+SpeedInput.TextColor3 = Color3.new(1, 1, 1)
+SpeedInput.Font = Enum.Font.Gotham
+SpeedInput.TextSize = 12
+local speedInputCorner = Instance.new("UICorner", SpeedInput)
+speedInputCorner.CornerRadius = UDim.new(0, 8)
+local speedInputStroke = Instance.new("UIStroke", SpeedInput)
+speedInputStroke.Color = Config.Theme.Border
+speedInputStroke.Thickness = 2
+
+local NoclipToggle = Instance.new("TextButton", ExploitsPage)
+NoclipToggle.Text = "Noclip: Desativado"
+NoclipToggle.Size = UDim2.new(0, 150, 0, 30)
+NoclipToggle.Position = UDim2.new(0, 20, 0, 60)
+NoclipToggle.BackgroundColor3 = Config.Theme.Secondary
+NoclipToggle.TextColor3 = Color3.new(1, 1, 1)
+NoclipToggle.Font = Enum.Font.Gotham
+NoclipToggle.TextSize = 12
+local noclipCorner = Instance.new("UICorner", NoclipToggle)
+noclipCorner.CornerRadius = UDim.new(0, 8)
+local noclipStroke = Instance.new("UIStroke", NoclipToggle)
+noclipStroke.Color = Config.Theme.Border
+noclipStroke.Thickness = 2
+
+local FlyToggle = Instance.new("TextButton", ExploitsPage)
+FlyToggle.Text = "Fly: Desativado"
+FlyToggle.Size = UDim2.new(0, 150, 0, 30)
+FlyToggle.Position = UDim2.new(0, 180, 0, 60)
+FlyToggle.BackgroundColor3 = Config.Theme.Secondary
+FlyToggle.TextColor3 = Color3.new(1, 1, 1)
+FlyToggle.Font = Enum.Font.Gotham
+FlyToggle.TextSize = 12
+local flyCorner = Instance.new("UICorner", FlyToggle)
+flyCorner.CornerRadius = UDim.new(0, 8)
+local flyStroke = Instance.new("UIStroke", FlyToggle)
+flyStroke.Color = Config.Theme.Border
+flyStroke.Thickness = 2
+
+local InfiniteJumpToggle = Instance.new("TextButton", ExploitsPage)
+InfiniteJumpToggle.Text = "Infinite Jump: Desativado"
+InfiniteJumpToggle.Size = UDim2.new(0, 150, 0, 30)
+InfiniteJumpToggle.Position = UDim2.new(0, 20, 0, 100)
+InfiniteJumpToggle.BackgroundColor3 = Config.Theme.Secondary
+InfiniteJumpToggle.TextColor3 = Color3.new(1, 1, 1)
+InfiniteJumpToggle.Font = Enum.Font.Gotham
+InfiniteJumpToggle.TextSize = 12
+local infiniteJumpCorner = Instance.new("UICorner", InfiniteJumpToggle)
+infiniteJumpCorner.CornerRadius = UDim.new(0, 8)
+local infiniteJumpStroke = Instance.new("UIStroke", InfiniteJumpToggle)
+infiniteJumpStroke.Color = Config.Theme.Border
+infiniteJumpStroke.Thickness = 2
+
+local FlingButton = Instance.new("TextButton", ExploitsPage)
+FlingButton.Text = "Fling"
+FlingButton.Size = UDim2.new(0, 150, 0, 30)
+FlingButton.Position = UDim2.new(0, 180, 0, 100)
+FlingButton.BackgroundColor3 = Config.Theme.Secondary
+FlingButton.TextColor3 = Color3.new(1, 1, 1)
+FlingButton.Font = Enum.Font.Gotham
+FlingButton.TextSize = 12
+local flingCorner = Instance.new("UICorner", FlingButton)
+flingCorner.CornerRadius = UDim.new(0, 8)
+local flingStroke = Instance.new("UIStroke", FlingButton)
+flingStroke.Color = Config.Theme.Border
+flingStroke.Thickness = 2
+
+local WallWalkToggle = Instance.new("TextButton", ExploitsPage)
+WallWalkToggle.Text = "Wall Walk: Desativado"
+WallWalkToggle.Size = UDim2.new(0, 150, 0, 30)
+WallWalkToggle.Position = UDim2.new(0, 20, 0, 140)
+WallWalkToggle.BackgroundColor3 = Config.Theme.Secondary
+WallWalkToggle.TextColor3 = Color3.new(1, 1, 1)
+WallWalkToggle.Font = Enum.Font.Gotham
+WallWalkToggle.TextSize = 12
+local wallWalkCorner = Instance.new("UICorner", WallWalkToggle)
+wallWalkCorner.CornerRadius = UDim.new(0, 8)
+local wallWalkStroke = Instance.new("UIStroke", WallWalkToggle)
+wallWalkStroke.Color = Config.Theme.Border
+wallWalkStroke.Thickness = 2
+
+local WallTPToggle = Instance.new("TextButton", ExploitsPage)
+WallTPToggle.Text = "Wall TP: Desativado"
+WallTPToggle.Size = UDim2.new(0, 150, 0, 30)
+WallTPToggle.Position = UDim2.new(0, 180, 0, 140)
+WallTPToggle.BackgroundColor3 = Config.Theme.Secondary
+WallTPToggle.TextColor3 = Color3.new(1, 1, 1)
+WallTPToggle.Font = Enum.Font.Gotham
+WallTPToggle.TextSize = 12
+local wallTPCorner = Instance.new("UICorner", WallTPToggle)
+wallTPCorner.CornerRadius = UDim.new(0, 8)
+local wallTPStroke = Instance.new("UIStroke", WallTPToggle)
+wallTPStroke.Color = Config.Theme.Border
+wallTPStroke.Thickness = 2
+
+local ReduceHitboxToggle = Instance.new("TextButton", ExploitsPage)
+ReduceHitboxToggle.Text = "Reduce Hitbox: Desativado"
+ReduceHitboxToggle.Size = UDim2.new(0, 150, 0, 30)
+ReduceHitboxToggle.Position = UDim2.new(0, 20, 0, 180)
+ReduceHitboxToggle.BackgroundColor3 = Config.Theme.Secondary
+ReduceHitboxToggle.TextColor3 = Color3.new(1, 1, 1)
+ReduceHitboxToggle.Font = Enum.Font.Gotham
+ReduceHitboxToggle.TextSize = 12
+local reduceHitboxCorner = Instance.new("UICorner", ReduceHitboxToggle)
+reduceHitboxCorner.CornerRadius = UDim.new(0, 8)
+local reduceHitboxStroke = Instance.new("UIStroke", ReduceHitboxToggle)
+reduceHitboxStroke.Color = Config.Theme.Border
+reduceHitboxStroke.Thickness = 2
+
+local XrayToggle = Instance.new("TextButton", ExploitsPage)
+XrayToggle.Text = "X-ray: Desativado"
+XrayToggle.Size = UDim2.new(0, 150, 0, 30)
+XrayToggle.Position = UDim2.new(0, 180, 0, 180)
+XrayToggle.BackgroundColor3 = Config.Theme.Secondary
+XrayToggle.TextColor3 = Color3.new(1, 1, 1)
+XrayToggle.Font = Enum.Font.Gotham
+XrayToggle.TextSize = 12
+local xrayCorner = Instance.new("UICorner", XrayToggle)
+xrayCorner.CornerRadius = UDim.new(0, 8)
+local xrayStroke = Instance.new("UIStroke", XrayToggle)
+xrayStroke.Color = Config.Theme.Border
+xrayStroke.Thickness = 2
+
+local InvisibleToggle = Instance.new("TextButton", ExploitsPage)
+InvisibleToggle.Text = "Invisible: Desativado"
+InvisibleToggle.Size = UDim2.new(0, 150, 0, 30)
+InvisibleToggle.Position = UDim2.new(0, 20, 0, 220)
+InvisibleToggle.BackgroundColor3 = Config.Theme.Secondary
+InvisibleToggle.TextColor3 = Color3.new(1, 1, 1)
+InvisibleToggle.Font = Enum.Font.Gotham
+InvisibleToggle.TextSize = 12
+local invisibleCorner = Instance.new("UICorner", InvisibleToggle)
+invisibleCorner.CornerRadius = UDim.new(0, 8)
+local invisibleStroke = Instance.new("UIStroke", InvisibleToggle)
+invisibleStroke.Color = Config.Theme.Border
+invisibleStroke.Thickness = 2
+
+local FlingAuraToggle = Instance.new("TextButton", ExploitsPage)
+FlingAuraToggle.Text = "Fling Aura: Desativado"
+FlingAuraToggle.Size = UDim2.new(0, 150, 0, 30)
+FlingAuraToggle.Position = UDim2.new(0, 180, 0, 220)
+FlingAuraToggle.BackgroundColor3 = Config.Theme.Secondary
+FlingAuraToggle.TextColor3 = Color3.new(1, 1, 1)
+FlingAuraToggle.Font = Enum.Font.Gotham
+FlingAuraToggle.TextSize = 12
+local flingAuraCorner = Instance.new("UICorner", FlingAuraToggle)
+flingAuraCorner.CornerRadius = UDim.new(0, 8)
+local flingAuraStroke = Instance.new("UIStroke", FlingAuraToggle)
+flingAuraStroke.Color = Config.Theme.Border
+flingAuraStroke.Thickness = 2
+
+local KillAuraToggle = Instance.new("TextButton", ExploitsPage)
+KillAuraToggle.Text = "Kill Aura: Desativado"
+KillAuraToggle.Size = UDim2.new(0, 150, 0, 30)
+KillAuraToggle.Position = UDim2.new(0, 20, 0, 260)
+KillAuraToggle.BackgroundColor3 = Config.Theme.Secondary
+KillAuraToggle.TextColor3 = Color3.new(1, 1, 1)
+KillAuraToggle.Font = Enum.Font.Gotham
+KillAuraToggle.TextSize = 12
+local killAuraCorner = Instance.new("UICorner", KillAuraToggle)
+killAuraCorner.CornerRadius = UDim.new(0, 8)
+local killAuraStroke = Instance.new("UIStroke", KillAuraToggle)
+killAuraStroke.Color = Config.Theme.Border
+killAuraStroke.Thickness = 2
+
+local CollectAllExploitButton = Instance.new("TextButton", ExploitsPage)
+CollectAllExploitButton.Text = "Coletar Tudo"
+CollectAllExploitButton.Size = UDim2.new(0, 150, 0, 30)
+CollectAllExploitButton.Position = UDim2.new(0, 180, 0, 260)
+CollectAllExploitButton.BackgroundColor3 = Config.Theme.Secondary
+CollectAllExploitButton.TextColor3 = Color3.new(1, 1, 1)
+CollectAllExploitButton.Font = Enum.Font.Gotham
+CollectAllExploitButton.TextSize = 12
+local collectAllCorner = Instance.new("UICorner", CollectAllExploitButton)
+collectAllCorner.CornerRadius = UDim.new(0, 8)
+local collectAllStroke = Instance.new("UIStroke", CollectAllExploitButton)
+collectAllStroke.Color = Config.Theme.Border
+collectAllStroke.Thickness = 2
+
+-- Aba Tools
+local ToolsPage = pages["Tools"]
+local TeleportToolButton = Instance.new("TextButton", ToolsPage)
+TeleportToolButton.Text = "Criar Teleport Tool"
+TeleportToolButton.Size = UDim2.new(0, 150, 0, 30)
+TeleportToolButton.Position = UDim2.new(0, 20, 0, 20)
+TeleportToolButton.BackgroundColor3 = Config.Theme.Secondary
+TeleportToolButton.TextColor3 = Color3.new(1, 1, 1)
+TeleportToolButton.Font = Enum.Font.Gotham
+TeleportToolButton.TextSize = 12
+local teleportToolCorner = Instance.new("UICorner", TeleportToolButton)
+teleportToolCorner.CornerRadius = UDim.new(0, 8)
+local teleportToolStroke = Instance.new("UIStroke", TeleportToolButton)
+teleportToolStroke.Color = Config.Theme.Border
+teleportToolStroke.Thickness = 2
+
+local InvisibilityCloakButton = Instance.new("TextButton", ToolsPage)
+InvisibilityCloakButton.Text = "Criar Invisibility Cloak"
+InvisibilityCloakButton.Size = UDim2.new(0, 150, 0, 30)
+InvisibilityCloakButton.Position = UDim2.new(0, 180, 0, 20)
+InvisibilityCloakButton.BackgroundColor3 = Config.Theme.Secondary
+InvisibilityCloakButton.TextColor3 = Color3.new(1, 1, 1)
+InvisibilityCloakButton.Font = Enum.Font.Gotham
+InvisibilityCloakButton.TextSize = 12
+local invisibilityCloakCorner = Instance.new("UICorner", InvisibilityCloakButton)
+invisibilityCloakCorner.CornerRadius = UDim.new(0, 8)
+local invisibilityCloakStroke = Instance.new("UIStroke", InvisibilityCloakButton)
+invisibilityCloakStroke.Color = Config.Theme.Border
+invisibilityCloakStroke.Thickness = 2
+
+local HealthRegenButton = Instance.new("TextButton", ToolsPage)
+HealthRegenButton.Text = "Criar Health Regen"
+HealthRegenButton.Size = UDim2.new(0, 150, 0, 30)
+HealthRegenButton.Position = UDim2.new(0, 20, 0, 60)
+HealthRegenButton.BackgroundColor3 = Config.Theme.Secondary
+HealthRegenButton.TextColor3 = Color3.new(1, 1, 1)
+HealthRegenButton.Font = Enum.Font.Gotham
+HealthRegenButton.TextSize = 12
+local healthRegenCorner = Instance.new("UICorner", HealthRegenButton)
+healthRegenCorner.CornerRadius = UDim.new(0, 8)
+local healthRegenStroke = Instance.new("UIStroke", HealthRegenButton)
+healthRegenStroke.Color = Config.Theme.Border
+healthRegenStroke.Thickness = 2
+
+local CollectAllToolButton = Instance.new("TextButton", ToolsPage)
+CollectAllToolButton.Text = "Criar Collect All Tool"
+CollectAllToolButton.Size = UDim2.new(0, 150, 0, 30)
+CollectAllToolButton.Position = UDim2.new(0, 180, 0, 60)
+CollectAllToolButton.BackgroundColor3 = Config.Theme.Secondary
+CollectAllToolButton.TextColor3 = Color3.new(1, 1, 1)
+CollectAllToolButton.Font = Enum.Font.Gotham
+CollectAllToolButton.TextSize = 12
+local collectAllToolCorner = Instance.new("UICorner", CollectAllToolButton)
+collectAllToolCorner.CornerRadius = UDim.new(0, 8)
+local collectAllToolStroke = Instance.new("UIStroke", CollectAllToolButton)
+collectAllToolStroke.Color = Config.Theme.Border
+collectAllToolStroke.Thickness = 2
+
+-- Função para atualizar a lista de waypoints
+local function updateWaypointList()
+    for _, child in pairs(WaypointList:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
+    local yOffset = 0
+    for name, cframe in pairs(Waypoints) do
+        local waypointFrame = Instance.new("Frame", WaypointList)
+        waypointFrame.Size = UDim2.new(1, -10, 0, 30)
+        waypointFrame.Position = UDim2.new(0, 5, 0, yOffset)
+        waypointFrame.BackgroundTransparency = 1
+        local waypointButton = Instance.new("TextButton", waypointFrame)
+        waypointButton.Text = name
+        waypointButton.Size = UDim2.new(0, 200, 0, 30)
+        waypointButton.BackgroundColor3 = Config.Theme.Secondary
+        waypointButton.TextColor3 = Color3.new(1, 1, 1)
+        waypointButton.Font = Enum.Font.Gotham
+        waypointButton.TextSize = 12
+        local wpCorner = Instance.new("UICorner", waypointButton)
+        wpCorner.CornerRadius = UDim.new(0, 8)
+        local wpStroke = Instance.new("UIStroke", waypointButton)
+        wpStroke.Color = Config.Theme.Border
+        wpStroke.Thickness = 2
+        local deleteButton = Instance.new("TextButton", waypointFrame)
+        deleteButton.Text = "X"
+        deleteButton.Size = UDim2.new(0, 30, 0, 30)
+        deleteButton.Position = UDim2.new(1, -40, 0, 0)
+        deleteButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        deleteButton.TextColor3 = Color3.new(1, 1, 1)
+        deleteButton.Font = Enum.Font.Gotham
+        deleteButton.TextSize = 12
+        local delCorner = Instance.new("UICorner", deleteButton)
+        delCorner.CornerRadius = UDim.new(0, 8)
+        local delStroke = Instance.new("UIStroke", deleteButton)
+        delStroke.Color = Config.Theme.Border
+        delStroke.Thickness = 2
+        waypointButton.MouseButton1Click:Connect(function()
+            local success, message = teleportTo(cframe)
+            if success then showNotification(message) end
+        end)
+        deleteButton.MouseButton1Click:Connect(function()
+            Waypoints[name] = nil
+            updateWaypointList()
+            showNotification("Waypoint " .. name .. " removido")
+        end)
+        yOffset = yOffset + 35
+        WaypointList.CanvasSize = UDim2.new(0, 0, 0, yOffset)
+    end
+end
+
+-- Função para atualizar a lista de jogadores
+local function updatePlayerList()
+    for _, child in pairs(PlayerList:GetChildren()) do
+        if child:IsA("TextButton") then child:Destroy() end
+    end
+    local yOffset = 0
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local playerButton = Instance.new("TextButton", PlayerList)
+            playerButton.Text = player.Name
+            playerButton.Size = UDim2.new(1, -10, 0, 30)
+            playerButton.Position = UDim2.new(0, 5, 0, yOffset)
+            playerButton.BackgroundColor3 = Config.Theme.Secondary
+            playerButton.TextColor3 = Color3.new(1, 1, 1)
+            playerButton.Font = Enum.Font.Gotham
+            playerButton.TextSize = 12
+            local plrCorner = Instance.new("UICorner", playerButton)
+            plrCorner.CornerRadius = UDim.new(0, 8)
+            local plrStroke = Instance.new("UIStroke", playerButton)
+            plrStroke.Color = Config.Theme.Border
+            plrStroke.Thickness = 2
+            playerButton.MouseButton1Click:Connect(function()
+                local success, message = teleportTo(player)
+                if success then showNotification(message) end
+            end)
+            yOffset = yOffset + 35
+        end
+    end
+    PlayerList.CanvasSize = UDim2.new(0, 0, 0, yOffset)
+end
+
+-- Conexões de botões
+local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local function setupButtonAnimations(button)
+    button.MouseEnter:Connect(function()
+        TweenService:Create(button, tweenInfo, {BackgroundColor3 = Config.Theme.Secondary:Lerp(Color3.new(1, 1, 1), 0.1)}):Play()
+    end)
+    button.MouseLeave:Connect(function()
+        TweenService:Create(button, tweenInfo, {BackgroundColor3 = Config.Theme.Secondary}):Play()
+    end)
+    button.MouseButton1Down:Connect(function()
+        TweenService:Create(button, tweenInfo, {Size = button.Size - UDim2.new(0, 5, 0, 5)}):Play()
+    end)
+    button.MouseButton1Up:Connect(function()
+        TweenService:Create(button, tweenInfo, {Size = button.Size + UDim2.new(0, 5, 0, 5)}):Play()
+    end)
+end
+
+setupButtonAnimations(ESPToggle)
+setupButtonAnimations(HealthToggle)
+setupButtonAnimations(DistanceToggle)
+setupButtonAnimations(OutlineToggle)
+setupButtonAnimations(HitboxESPToggle)
+setupButtonAnimations(FilterTeamToggle)
+setupButtonAnimations(FilterFriendsToggle)
+setupButtonAnimations(CreateWaypointButton)
+setupButtonAnimations(TeleportButton)
+setupButtonAnimations(AimbotToggle)
+setupButtonAnimations(StartRecordingButton)
+setupButtonAnimations(PlayReverseButton)
+setupButtonAnimations(SpeedHackToggle)
+setupButtonAnimations(NoclipToggle)
+setupButtonAnimations(FlyToggle)
+setupButtonAnimations(InfiniteJumpToggle)
+setupButtonAnimations(FlingButton)
+setupButtonAnimations(WallWalkToggle)
+setupButtonAnimations(WallTPToggle)
+setupButtonAnimations(ReduceHitboxToggle)
+setupButtonAnimations(XrayToggle)
+setupButtonAnimations(InvisibleToggle)
+setupButtonAnimations(FlingAuraToggle)
+setupButtonAnimations(KillAuraToggle)
+setupButtonAnimations(CollectAllExploitButton)
+setupButtonAnimations(TeleportToolButton)
+setupButtonAnimations(InvisibilityCloakButton)
+setupButtonAnimations(HealthRegenButton)
+setupButtonAnimations(CollectAllToolButton)
+setupButtonAnimations(MinimizeButton)
+setupButtonAnimations(RestoreButton)
+
+ESPToggle.MouseButton1Click:Connect(function()
+    ESPConfig.Enabled = not ESPConfig.Enabled
+    ESPToggle.Text = ESPConfig.Enabled and "Desativar ESP" or "Ativar ESP"
+    showNotification("ESP " .. (ESPConfig.Enabled and "ativado" or "desativado"))
+end)
+
+HealthToggle.MouseButton1Click:Connect(function()
+    ESPConfig.ShowHealth = not ESPConfig.ShowHealth
+    HealthToggle.Text = ESPConfig.ShowHealth and "Saúde: Ativado" or "Saúde: Desativado"
+    showNotification("ESP de saúde " .. (ESPConfig.ShowHealth and "ativado" or "desativado"))
+end)
+
+DistanceToggle.MouseButton1Click:Connect(function()
+    ESPConfig.ShowDistance = not ESPConfig.ShowDistance
+    DistanceToggle.Text = ESPConfig.ShowDistance and "Distância: Ativado" or "Distância: Desativado"
+    showNotification("ESP de distância " .. (ESPConfig.ShowDistance and "ativado" or "desativado"))
+end)
+
+OutlineToggle.MouseButton1Click:Connect(function()
+    ESPConfig.OutlineEnabled = not ESPConfig.OutlineEnabled
+    OutlineToggle.Text = ESPConfig.OutlineEnabled and "Contorno: Ativado" or "Contorno: Desativado"
+    showNotification("Contorno do ESP " .. (ESPConfig.OutlineEnabled and "ativado" or "desativado"))
+end)
+
+HitboxESPToggle.MouseButton1Click:Connect(function()
+    ESPConfig.HitboxEnabled = not ESPConfig.HitboxEnabled
+    HitboxESPToggle.Text = ESPConfig.HitboxEnabled and "Hitbox ESP: Ativado" or "Hitbox ESP: Desativado"
+    showNotification("Hitbox ESP " .. (ESPConfig.HitboxEnabled and "ativado" or "desativado"))
+end)
+
+FilterTeamToggle.MouseButton1Click:Connect(function()
+    ESPConfig.FilterByTeam = not ESPConfig.FilterByTeam
+    FilterTeamToggle.Text = ESPConfig.FilterByTeam and "Filtrar Equipe: Ativado" or "Filtrar Equipe: Desativado"
+    showNotification("Filtro de equipe " .. (ESPConfig.FilterByTeam and "ativado" or "desativado"))
+end)
+
+FilterFriendsToggle.MouseButton1Click:Connect(function()
+    ESPConfig.FilterByFriends = not ESPConfig.FilterByFriends
+    FilterFriendsToggle.Text = ESPConfig.FilterByFriends and "Filtrar Amigos: Ativado" or "Filtrar Amigos: Desativado"
+    showNotification("Filtro de amigos " .. (ESPConfig.FilterByFriends and "ativado" or "desativado"))
+end)
+
+CreateWaypointButton.MouseButton1Click:Connect(function()
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local name = WaypointNameInput.Text
+        if name == "" or name == "Nome do waypoint" then
+            showNotification("Erro: Insira um nome válido para o waypoint")
+            return
+        end
+        Waypoints[name] = LocalPlayer.Character.HumanoidRootPart.CFrame
+        updateWaypointList()
+        showNotification("Waypoint " .. name .. " criado")
+    else
+        showNotification("Erro: Personagem não carregado")
+    end
+end)
+
+TeleportButton.MouseButton1Click:Connect(function()
+    local input = TeleportInput.Text
+    if Waypoints[input] then
+        local success, message = teleportTo(Waypoints[input])
+        if success then showNotification(message) end
+    else
+        local player = Players:FindFirstChild(input)
+        if player then
+            local success, message = teleportTo(player)
+            if success then showNotification(message) end
+        else
+            showNotification("Erro: Jogador ou waypoint não encontrado")
+        end
+    end
+end)
+
+AimbotToggle.MouseButton1Click:Connect(function()
+    aimbotEnabled = not aimbotEnabled
+    AimbotToggle.Text = aimbotEnabled and "Desativar Aimbot" or "Ativar Aimbot"
+    showNotification("Aimbot " .. (aimbotEnabled and "ativado" or "desativado"))
+end)
+
+StartRecordingButton.MouseButton1Click:Connect(function()
+    PathRecording.Recording = not PathRecording.Recording
+    StartRecordingButton.Text = PathRecording.Recording and "Parar Gravação" or "Iniciar Gravação"
+    if PathRecording.Recording then
+        PathRecording.Path = {}
+        showNotification("Gravação de caminho iniciada")
+    else
+        showNotification("Gravação de caminho parada")
+    end
+end)
+
+PlayReverseButton.MouseButton1Click:Connect(function()
+    if #PathRecording.Path > 0 and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        for i = #PathRecording.Path, 1, -1 do
+            local success, message = teleportTo(PathRecording.Path[i])
+            if success then
+                wait(0.1)
+            else
+                showNotification(message)
+                break
+            end
+        end
+        showNotification("Reprodução reversa concluída")
+    else
+        showNotification("Erro: Nenhum caminho gravado ou personagem não carregado")
+    end
+end)
+
+SpeedHackToggle.MouseButton1Click:Connect(function()
+    speedHackEnabled = not speedHackEnabled
+    SpeedHackToggle.Text = speedHackEnabled and "Speed Hack: Ativado" or "Speed Hack: Desativado"
+    applySpeedHack()
+    showNotification("Speed Hack " .. (speedHackEnabled and "ativado" or "desativado"))
+end)
+
+SpeedInput.FocusLost:Connect(function()
+    local value = tonumber(SpeedInput.Text)
+    if value then
+        speedValue = math.clamp(value, 16, 1000)
+        SpeedInput.Text = tostring(speedValue)
+        applySpeedHack()
+        showNotification("Velocidade definida para " .. speedValue)
+    else
+        SpeedInput.Text = tostring(speedValue)
+        showNotification("Erro: Insira um número válido")
+    end
+end)
+
+NoclipToggle.MouseButton1Click:Connect(function()
+    noclipEnabled = not noclipEnabled
+    NoclipToggle.Text = noclipEnabled and "Noclip: Ativado" or "Noclip: Desativado"
+    applyNoclip(LocalPlayer.Character)
+    showNotification("Noclip " .. (noclipEnabled and "ativado" or "desativado"))
+end)
+
+FlyToggle.MouseButton1Click:Connect(function()
+    flyEnabled = not flyEnabled
+    FlyToggle.Text = flyEnabled and "Fly: Ativado" or "Fly: Desativado"
+    toggleFly()
+    showNotification("Fly " .. (flyEnabled and "ativado" or "desativado"))
+end)
+
+InfiniteJumpToggle.MouseButton1Click:Connect(function()
+    infiniteJumpEnabled = not infiniteJumpEnabled
+    InfiniteJumpToggle.Text = infiniteJumpEnabled and "Infinite Jump: Ativado" or "Infinite Jump: Desativado"
+    showNotification("Infinite Jump " .. (infiniteJumpEnabled and "ativado" or "desativado"))
+end)
+
+FlingButton.MouseButton1Click:Connect(function()
+    fling()
+end)
+
+WallWalkToggle.MouseButton1Click:Connect(function()
+    wallWalkEnabled = not wallWalkEnabled
+    WallWalkToggle.Text = wallWalk
+WallWalkToggle.Text = wallWalkEnabled and "Wall Walk: Ativado" or "Wall Walk: Desativado"
+    applyWallWalk(LocalPlayer.Character)
+    showNotification("Wall Walk " .. (wallWalkEnabled and "ativado" or "desativado"))
+end)
+
+WallTPToggle.MouseButton1Click:Connect(function()
+    wallTPEnabled = not wallTPEnabled
+    WallTPToggle.Text = wallTPEnabled and "Wall TP: Ativado" or "Wall TP: Desativado"
+    showNotification("Wall TP " .. (wallTPEnabled and "ativado" or "desativado"))
+end)
+
+ReduceHitboxToggle.MouseButton1Click:Connect(function()
+    reduceHitboxEnabled = not reduceHitboxEnabled
+    ReduceHitboxToggle.Text = reduceHitboxEnabled and "Reduce Hitbox: Ativado" or "Reduce Hitbox: Desativado"
+    applyReduceHitbox(LocalPlayer.Character)
+    showNotification("Reduce Hitbox " .. (reduceHitboxEnabled and "ativado" or "desativado"))
+end)
+
+XrayToggle.MouseButton1Click:Connect(function()
+    xrayEnabled = not xrayEnabled
+    XrayToggle.Text = xrayEnabled and "X-ray: Ativado" or "X-ray: Desativado"
+    applyXray()
+    showNotification("X-ray " .. (xrayEnabled and "ativado" or "desativado"))
+end)
+
+InvisibleToggle.MouseButton1Click:Connect(function()
+    invisibleEnabled = not invisibleEnabled
+    InvisibleToggle.Text = invisibleEnabled and "Invisible: Ativado" or "Invisible: Desativado"
+    applyInvisible()
+    showNotification("Invisibilidade " .. (invisibleEnabled and "ativado" or "desativado"))
+end)
+
+FlingAuraToggle.MouseButton1Click:Connect(function()
+    flingAuraEnabled = not flingAuraEnabled
+    FlingAuraToggle.Text = flingAuraEnabled and "Fling Aura: Ativado" or "Fling Aura: Desativado"
+    showNotification("Fling Aura " .. (flingAuraEnabled and "ativado" or "desativado"))
+end)
+
+KillAuraToggle.MouseButton1Click:Connect(function()
+    killAuraEnabled = not killAuraEnabled
+    KillAuraToggle.Text = killAuraEnabled and "Kill Aura: Ativado" or "Kill Aura: Desativado"
+    showNotification("Kill Aura " .. (killAuraEnabled and "ativado" or "desativado"))
+end)
+
+CollectAllExploitButton.MouseButton1Click:Connect(function()
+    collectAllExploit()
+end)
+
+TeleportToolButton.MouseButton1Click:Connect(function()
+    createTeleportTool()
+end)
+
+InvisibilityCloakButton.MouseButton1Click:Connect(function()
+    createInvisibilityCloakTool()
+end)
+
+HealthRegenButton.MouseButton1Click:Connect(function()
+    createHealthRegenTool()
+end)
+
+CollectAllToolButton.MouseButton1Click:Connect(function()
+    createCollectAllTool()
+end)
+
+MinimizeButton.MouseButton1Click:Connect(function()
+    guiMinimized = not guiMinimized
+    MainFrame.Visible = not guiMinimized
+    RestoreButton.Visible = guiMinimized
+    local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    if guiMinimized then
+        TweenService:Create(MainFrame, tweenInfo, {Size = UDim2.new(0, 400, 0, 0)}):Play()
+        showNotification("GUI minimizada")
+    else
+        TweenService:Create(MainFrame, tweenInfo, {Size = UDim2.new(0, 400, 0, 300)}):Play()
+        showNotification("GUI restaurada")
+    end
+end)
+
+RestoreButton.MouseButton1Click:Connect(function()
+    guiMinimized = false
+    MainFrame.Visible = true
+    RestoreButton.Visible = false
+    TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 400, 0, 300)}):Play()
+    showNotification("GUI restaurada")
+end)
+
+-- Função para arrastar a GUI
+local dragging, dragInput, dragStart, startPos
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+MainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- Aimbot
+local function getClosestPlayerToMouse()
+    local closestPlayer = nil
+    local shortestDistance = tonumber(FOVInput.Text) or 90
+    local mousePos = UserInputService:GetMouseLocation()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            local screenPos, onScreen = Workspace.CurrentCamera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
+            if onScreen then
+                local distance = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
+                if distance < shortestDistance then
+                    if not ESPConfig.FilterByTeam or player.Team ~= LocalPlayer.Team then
+                        if not ESPConfig.FilterByFriends or player:IsFriendsWith(LocalPlayer.UserId) then
+                            closestPlayer = player
+                            shortestDistance = distance
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+RunService.RenderStepped:Connect(function()
+    if aimbotEnabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+        local target = getClosestPlayerToMouse()
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            local smoothness = tonumber(SmoothnessInput.Text) or 0.5
+            local targetPos = target.Character.HumanoidRootPart.Position
+            local camera = Workspace.CurrentCamera
+            local currentCFrame = camera.CFrame
+            local lookAtCFrame = CFrame.new(currentCFrame.Position, targetPos)
+            camera.CFrame = currentCFrame:Lerp(lookAtCFrame, smoothness)
+        end
+    end
+end)
+
+-- Infinite Jump
+UserInputService.JumpRequest:Connect(function()
+    if infiniteJumpEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+
+-- Fly controls
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed or not flyEnabled or not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+    local rootPart = LocalPlayer.Character.HumanoidRootPart
+    local bodyVelocity = rootPart:FindFirstChild("FlyVelocity")
+    if not bodyVelocity then return end
+    if input.KeyCode == Enum.KeyCode.W then
+        bodyVelocity.Velocity = rootPart.CFrame.LookVector * speedValue
+    elseif input.KeyCode == Enum.KeyCode.S then
+        bodyVelocity.Velocity = rootPart.CFrame.LookVector * -speedValue
+    elseif input.KeyCode == Enum.KeyCode.A then
+        bodyVelocity.Velocity = rootPart.CFrame.RightVector * -speedValue
+    elseif input.KeyCode == Enum.KeyCode.D then
+        bodyVelocity.Velocity = rootPart.CFrame.RightVector * speedValue
+    elseif input.KeyCode == Enum.KeyCode.Space then
+        bodyVelocity.Velocity = Vector3.new(0, speedValue, 0)
+    elseif input.KeyCode == Enum.KeyCode.LeftControl then
+        bodyVelocity.Velocity = Vector3.new(0, -speedValue, 0)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gameProcessed)
+    if gameProcessed or not flyEnabled or not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+    local rootPart = LocalPlayer.Character.HumanoidRootPart
+    local bodyVelocity = rootPart:FindFirstChild("FlyVelocity")
+    if not bodyVelocity then return end
+    if input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.S or input.KeyCode == Enum.KeyCode.A or input.KeyCode == Enum.KeyCode.D or input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.LeftControl then
+        bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    end
+end)
+
+-- Wall Walk e Wall TP
+RunService.Heartbeat:Connect(function()
+    if wallWalkEnabled and LocalPlayer.Character then
+        applyWallWalk(LocalPlayer.Character)
+    end
+    if wallTPEnabled and UserInputService:IsKeyDown(Enum.KeyCode.E) then
+        wallTP()
+    end
+    if flingAuraEnabled then
+        flingAura()
+    end
+    if killAuraEnabled then
+        killAura()
+    end
+end)
+
+-- Gravação de caminho
+RunService.Heartbeat:Connect(function()
+    if PathRecording.Recording and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        table.insert(PathRecording.Path, LocalPlayer.Character.HumanoidRootPart.CFrame)
+    end
+end)
+
+-- Atualização de ESP e listas
+Players.PlayerAdded:Connect(function(player)
+    createESP(player)
+    updatePlayerList()
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    if ESPBillboards[player] then
+        ESPBillboards[player].Billboard:Destroy()
+        ESPBillboards[player].Highlight:Destroy()
+        ESPBillboards[player].HitboxHighlight:Destroy()
+        ESPBillboards[player] = nil
+    end
+    updatePlayerList()
+end)
+
+LocalPlayer.CharacterAdded:Connect(function(character)
+    applyNoclip(character)
+    applyInvisible()
+    applyReduceHitbox(character)
+    applySpeedHack()
+    applyWallWalk(character)
+end)
+
+-- Inicialização
+for _, player in pairs(Players:GetPlayers()) do
+    createESP(player)
+end
+updatePlayerList()
+showNotification("Archon Nexus GUI carregada com sucesso!")
+
+-- Fim do código
+debugLog("Script carregado completamente")
+print("=== Código completo ===")
