@@ -1,3 +1,4 @@
+-- Script Lua otimizado para Roblox com GUI avançada, exploits funcionais e design fluido
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -11,7 +12,7 @@ local Waypoints = {}
 local PathRecording = { Recording = false, Path = {} }
 local Config = { 
     ESPColor = Color3.fromRGB(255, 255, 255), 
-    FontSize = 12, 
+    FontSize = 14, 
     Theme = { 
         Primary = Color3.fromRGB(20, 20, 80), 
         Secondary = Color3.fromRGB(50, 50, 170), 
@@ -46,7 +47,7 @@ local speedValue = 16
 local spectatingPlayer = nil
 local flingAuraRadius = 20
 local killAuraRadius = 10
-local originalSizes = {} -- Armazena tamanhos originais para ReduceHitbox
+local originalSizes = {}
 
 -- Função de debug
 local function debugLog(message)
@@ -63,6 +64,7 @@ local function showNotification(message)
     notification.Text = message
     notification.Font = Enum.Font.Gotham
     notification.TextSize = 12
+    notification.TextScaled = false
     notification.TextWrapped = true
     notification.Parent = game.Players.LocalPlayer.PlayerGui:FindFirstChild("EnhancedGUI")
     local corner = Instance.new("UICorner", notification)
@@ -128,9 +130,10 @@ local function createESP(player)
         nameLabel.Size = UDim2.new(1, 0, 0, 30)
         nameLabel.BackgroundTransparency = 1
         nameLabel.TextColor3 = Config.ESPColor
-        nameLabel.TextStrokeTransparency = 0.5
+        nameLabel.TextStrokeTransparency = 1
         nameLabel.Font = Enum.Font.GothamBold
         nameLabel.TextSize = Config.FontSize
+        nameLabel.TextScaled = false
         nameLabel.Parent = billboard
 
         local healthLabel = Instance.new("TextLabel")
@@ -139,8 +142,10 @@ local function createESP(player)
         healthLabel.Position = UDim2.new(0, 0, 0, 30)
         healthLabel.BackgroundTransparency = 1
         healthLabel.TextColor3 = Color3.new(0, 1, 0)
+        healthLabel.TextStrokeTransparency = 1
         healthLabel.Font = Enum.Font.Gotham
         healthLabel.TextSize = Config.FontSize - 2
+        healthLabel.TextScaled = false
         healthLabel.Parent = billboard
 
         local distanceLabel = Instance.new("TextLabel")
@@ -149,8 +154,10 @@ local function createESP(player)
         distanceLabel.Position = UDim2.new(0, 0, 0, 55)
         distanceLabel.BackgroundTransparency = 1
         distanceLabel.TextColor3 = Color3.new(1, 1, 0)
+        distanceLabel.TextStrokeTransparency = 1
         distanceLabel.Font = Enum.Font.Gotham
         distanceLabel.TextSize = Config.FontSize - 2
+        distanceLabel.TextScaled = false
         distanceLabel.Parent = billboard
 
         local highlight = Instance.new("Highlight")
@@ -232,20 +239,6 @@ local function createTeleportTool()
     end)
     debugLog("Teleport Tool criado")
     showNotification("Teleport Tool adicionado ao inventário")
-end
-
-local function createInvisibilityCloakTool()
-    local tool = Instance.new("Tool")
-    tool.Name = "InvisibilityCloak"
-    tool.RequiresHandle = false
-    tool.Parent = LocalPlayer.Backpack
-    tool.Activated:Connect(function()
-        invisibleEnabled = not invisibleEnabled
-        applyInvisible()
-        showNotification("Invisibilidade " .. (invisibleEnabled and "ativada" or "desativada"))
-    end)
-    debugLog("Invisibility Cloak criado")
-    showNotification("Invisibility Cloak adicionado ao inventário")
 end
 
 local function createHealthRegenTool()
@@ -504,17 +497,19 @@ local function collectAllExploit()
 end
 
 local function spectatePlayer(player)
-    if not player or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+    if not player or not player.Character or not player.Character:FindFirstChild("Humanoid") then
         showNotification("Erro: Jogador não válido para espectar")
         return
     end
     spectatingPlayer = player
+    Workspace.CurrentCamera.CameraType = Enum.CameraType.Follow
     Workspace.CurrentCamera.CameraSubject = player.Character.Humanoid
     showNotification("Espectando " .. player.Name)
 end
 
 local function stopSpectating()
     if spectatingPlayer then
+        Workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
         Workspace.CurrentCamera.CameraSubject = LocalPlayer.Character and LocalPlayer.Character.Humanoid or nil
         showNotification("Espectação encerrada")
         spectatingPlayer = nil
@@ -558,6 +553,7 @@ TitleLabel.BackgroundTransparency = 1
 TitleLabel.TextColor3 = Color3.new(1, 1, 1)
 TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.TextSize = 14
+TitleLabel.TextScaled = false
 
 local MinimizeButton = Instance.new("TextButton", TitleBar)
 MinimizeButton.Text = "-"
@@ -607,6 +603,7 @@ for i, tabName in ipairs(tabs) do
     TabButton.TextColor3 = Color3.new(1, 1, 1)
     TabButton.Font = Enum.Font.Gotham
     TabButton.TextSize = 12
+    TabButton.TextScaled = false
     local tabCorner = Instance.new("UICorner", TabButton)
     tabCorner.CornerRadius = UDim.new(0, 8)
     local tabStroke = Instance.new("UIStroke", TabButton)
@@ -655,6 +652,7 @@ ESPToggle.BackgroundColor3 = Config.Theme.Secondary
 ESPToggle.TextColor3 = Color3.new(1, 1, 1)
 ESPToggle.Font = Enum.Font.Gotham
 ESPToggle.TextSize = 12
+ESPToggle.TextScaled = false
 local espCorner = Instance.new("UICorner", ESPToggle)
 espCorner.CornerRadius = UDim.new(0, 8)
 local espStroke = Instance.new("UIStroke", ESPToggle)
@@ -669,6 +667,7 @@ HealthToggle.BackgroundColor3 = Config.Theme.Secondary
 HealthToggle.TextColor3 = Color3.new(1, 1, 1)
 HealthToggle.Font = Enum.Font.Gotham
 HealthToggle.TextSize = 12
+HealthToggle.TextScaled = false
 local healthCorner = Instance.new("UICorner", HealthToggle)
 healthCorner.CornerRadius = UDim.new(0, 8)
 local healthStroke = Instance.new("UIStroke", HealthToggle)
@@ -683,6 +682,7 @@ DistanceToggle.BackgroundColor3 = Config.Theme.Secondary
 DistanceToggle.TextColor3 = Color3.new(1, 1, 1)
 DistanceToggle.Font = Enum.Font.Gotham
 DistanceToggle.TextSize = 12
+DistanceToggle.TextScaled = false
 local distanceCorner = Instance.new("UICorner", DistanceToggle)
 distanceCorner.CornerRadius = UDim.new(0, 8)
 local distanceStroke = Instance.new("UIStroke", DistanceToggle)
@@ -697,6 +697,7 @@ OutlineToggle.BackgroundColor3 = Config.Theme.Secondary
 OutlineToggle.TextColor3 = Color3.new(1, 1, 1)
 OutlineToggle.Font = Enum.Font.Gotham
 OutlineToggle.TextSize = 12
+OutlineToggle.TextScaled = false
 local outlineCorner = Instance.new("UICorner", OutlineToggle)
 outlineCorner.CornerRadius = UDim.new(0, 8)
 local outlineStroke = Instance.new("UIStroke", OutlineToggle)
@@ -711,6 +712,7 @@ HitboxESPToggle.BackgroundColor3 = Config.Theme.Secondary
 HitboxESPToggle.TextColor3 = Color3.new(1, 1, 1)
 HitboxESPToggle.Font = Enum.Font.Gotham
 HitboxESPToggle.TextSize = 12
+HitboxESPToggle.TextScaled = false
 local hitboxCorner = Instance.new("UICorner", HitboxESPToggle)
 hitboxCorner.CornerRadius = UDim.new(0, 8)
 local hitboxStroke = Instance.new("UIStroke", HitboxESPToggle)
@@ -725,6 +727,7 @@ FilterTeamToggle.BackgroundColor3 = Config.Theme.Secondary
 FilterTeamToggle.TextColor3 = Color3.new(1, 1, 1)
 FilterTeamToggle.Font = Enum.Font.Gotham
 FilterTeamToggle.TextSize = 12
+FilterTeamToggle.TextScaled = false
 local teamCorner = Instance.new("UICorner", FilterTeamToggle)
 teamCorner.CornerRadius = UDim.new(0, 8)
 local teamStroke = Instance.new("UIStroke", FilterTeamToggle)
@@ -739,6 +742,7 @@ FilterFriendsToggle.BackgroundColor3 = Config.Theme.Secondary
 FilterFriendsToggle.TextColor3 = Color3.new(1, 1, 1)
 FilterFriendsToggle.Font = Enum.Font.Gotham
 FilterFriendsToggle.TextSize = 12
+FilterFriendsToggle.TextScaled = false
 local friendsCorner = Instance.new("UICorner", FilterFriendsToggle)
 friendsCorner.CornerRadius = UDim.new(0, 8)
 local friendsStroke = Instance.new("UIStroke", FilterFriendsToggle)
@@ -767,6 +771,7 @@ WaypointNameInput.BackgroundColor3 = Config.Theme.Primary
 WaypointNameInput.TextColor3 = Color3.new(1, 1, 1)
 WaypointNameInput.Font = Enum.Font.Gotham
 WaypointNameInput.TextSize = 12
+WaypointNameInput.TextScaled = false
 local waypointInputCorner = Instance.new("UICorner", WaypointNameInput)
 waypointInputCorner.CornerRadius = UDim.new(0, 8)
 local waypointInputStroke = Instance.new("UIStroke", WaypointNameInput)
@@ -780,6 +785,7 @@ CreateWaypointButton.Position = UDim2.new(0, 230, 0, 20)
 CreateWaypointButton.BackgroundColor3 = Config.Theme.Secondary
 CreateWaypointButton.TextColor3 = Color3.new(1, 1, 1)
 CreateWaypointButton.TextSize = 12
+CreateWaypointButton.TextScaled = false
 local createWaypointCorner = Instance.new("UICorner", CreateWaypointButton)
 createWaypointCorner.CornerRadius = UDim.new(0, 8)
 local createWaypointStroke = Instance.new("UIStroke", CreateWaypointButton)
@@ -789,8 +795,8 @@ createWaypointStroke.Thickness = 2
 -- Aba Teleporte
 local TeleportPage = pages["Teleporte"]
 local PlayerList = Instance.new("ScrollingFrame", TeleportPage)
-PlayerList.Size = UDim2.new(0, 360, 0, 170)
-PlayerList.Position = UDim2.new(0, 20, 0, 60)
+PlayerList.Size = UDim2.new(0, 360, 0, 120)
+PlayerList.Position = UDim2.new(0, 20, 0, 100)
 PlayerList.BackgroundColor3 = Config.Theme.Primary
 PlayerList.CanvasSize = UDim2.new(0, 0, 0, 0)
 PlayerList.ScrollBarThickness = 5
@@ -810,6 +816,7 @@ TeleportInput.BackgroundColor3 = Config.Theme.Primary
 TeleportInput.TextColor3 = Color3.new(1, 1, 1)
 TeleportInput.Font = Enum.Font.Gotham
 TeleportInput.TextSize = 12
+TeleportInput.TextScaled = false
 local teleportInputCorner = Instance.new("UICorner", TeleportInput)
 teleportInputCorner.CornerRadius = UDim.new(0, 8)
 local teleportInputStroke = Instance.new("UIStroke", TeleportInput)
@@ -824,11 +831,42 @@ TeleportButton.BackgroundColor3 = Config.Theme.Secondary
 TeleportButton.TextColor3 = Color3.new(1, 1, 1)
 TeleportButton.Font = Enum.Font.Gotham
 TeleportButton.TextSize = 12
+TeleportButton.TextScaled = false
 local teleportButtonCorner = Instance.new("UICorner", TeleportButton)
 teleportButtonCorner.CornerRadius = UDim.new(0, 8)
 local teleportButtonStroke = Instance.new("UIStroke", TeleportButton)
 teleportButtonStroke.Color = Config.Theme.Border
 teleportButtonStroke.Thickness = 2
+
+local SpectateButton = Instance.new("TextButton", TeleportPage)
+SpectateButton.Text = "Espectar"
+SpectateButton.Size = UDim2.new(0, 150, 0, 30)
+SpectateButton.Position = UDim2.new(0, 20, 0, 60)
+SpectateButton.BackgroundColor3 = Config.Theme.Secondary
+SpectateButton.TextColor3 = Color3.new(1, 1, 1)
+SpectateButton.Font = Enum.Font.Gotham
+SpectateButton.TextSize = 12
+SpectateButton.TextScaled = false
+local spectateCorner = Instance.new("UICorner", SpectateButton)
+spectateCorner.CornerRadius = UDim.new(0, 8)
+local spectateStroke = Instance.new("UIStroke", SpectateButton)
+spectateStroke.Color = Config.Theme.Border
+spectateStroke.Thickness = 2
+
+local StopSpectateButton = Instance.new("TextButton", TeleportPage)
+StopSpectateButton.Text = "Parar Espectar"
+StopSpectateButton.Size = UDim2.new(0, 150, 0, 30)
+StopSpectateButton.Position = UDim2.new(0, 230, 0, 60)
+StopSpectateButton.BackgroundColor3 = Config.Theme.Secondary
+StopSpectateButton.TextColor3 = Color3.new(1, 1, 1)
+StopSpectateButton.Font = Enum.Font.Gotham
+StopSpectateButton.TextSize = 12
+StopSpectateButton.TextScaled = false
+local stopSpectateCorner = Instance.new("UICorner", StopSpectateButton)
+stopSpectateCorner.CornerRadius = UDim.new(0, 8)
+local stopSpectateStroke = Instance.new("UIStroke", StopSpectateButton)
+stopSpectateStroke.Color = Config.Theme.Border
+stopSpectateStroke.Thickness = 2
 
 -- Aba Aimbot
 local AimbotPage = pages["Aimbot"]
@@ -840,6 +878,7 @@ AimbotToggle.BackgroundColor3 = Config.Theme.Secondary
 AimbotToggle.TextColor3 = Color3.new(1, 1, 1)
 AimbotToggle.Font = Enum.Font.Gotham
 AimbotToggle.TextSize = 12
+AimbotToggle.TextScaled = false
 local aimbotCorner = Instance.new("UICorner", AimbotToggle)
 aimbotCorner.CornerRadius = UDim.new(0, 8)
 local aimbotStroke = Instance.new("UIStroke", AimbotToggle)
@@ -854,6 +893,7 @@ SmoothnessInput.BackgroundColor3 = Config.Theme.Primary
 SmoothnessInput.TextColor3 = Color3.new(1, 1, 1)
 SmoothnessInput.Font = Enum.Font.Gotham
 SmoothnessInput.TextSize = 12
+SmoothnessInput.TextScaled = false
 local smoothnessCorner = Instance.new("UICorner", SmoothnessInput)
 smoothnessCorner.CornerRadius = UDim.new(0, 8)
 local smoothnessStroke = Instance.new("UIStroke", SmoothnessInput)
@@ -868,6 +908,7 @@ FOVInput.BackgroundColor3 = Config.Theme.Primary
 FOVInput.TextColor3 = Color3.new(1, 1, 1)
 FOVInput.Font = Enum.Font.Gotham
 FOVInput.TextSize = 12
+FOVInput.TextScaled = false
 local fovCorner = Instance.new("UICorner", FOVInput)
 fovCorner.CornerRadius = UDim.new(0, 8)
 local fovStroke = Instance.new("UIStroke", FOVInput)
@@ -884,6 +925,7 @@ StartRecordingButton.BackgroundColor3 = Config.Theme.Secondary
 StartRecordingButton.TextColor3 = Color3.new(1, 1, 1)
 StartRecordingButton.Font = Enum.Font.Gotham
 StartRecordingButton.TextSize = 12
+StartRecordingButton.TextScaled = false
 local startRecordingCorner = Instance.new("UICorner", StartRecordingButton)
 startRecordingCorner.CornerRadius = UDim.new(0, 8)
 local startRecordingStroke = Instance.new("UIStroke", StartRecordingButton)
@@ -898,6 +940,7 @@ PlayReverseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 PlayReverseButton.TextColor3 = Color3.new(1, 1, 1)
 PlayReverseButton.Font = Enum.Font.Gotham
 PlayReverseButton.TextSize = 12
+PlayReverseButton.TextScaled = false
 local playReverseCorner = Instance.new("UICorner", PlayReverseButton)
 playReverseCorner.CornerRadius = UDim.new(0, 8)
 local playReverseStroke = Instance.new("UIStroke", PlayReverseButton)
@@ -914,6 +957,7 @@ SpeedHackToggle.BackgroundColor3 = Config.Theme.Secondary
 SpeedHackToggle.TextColor3 = Color3.new(1, 1, 1)
 SpeedHackToggle.Font = Enum.Font.Gotham
 SpeedHackToggle.TextSize = 12
+SpeedHackToggle.TextScaled = false
 local speedHackCorner = Instance.new("UICorner", SpeedHackToggle)
 speedHackCorner.CornerRadius = UDim.new(0, 8)
 local speedHackStroke = Instance.new("UIStroke", SpeedHackToggle)
@@ -928,6 +972,7 @@ SpeedInput.BackgroundColor3 = Config.Theme.Primary
 SpeedInput.TextColor3 = Color3.new(1, 1, 1)
 SpeedInput.Font = Enum.Font.Gotham
 SpeedInput.TextSize = 12
+SpeedInput.TextScaled = false
 local speedInputCorner = Instance.new("UICorner", SpeedInput)
 speedInputCorner.CornerRadius = UDim.new(0, 8)
 local speedInputStroke = Instance.new("UIStroke", SpeedInput)
@@ -942,6 +987,7 @@ NoclipToggle.BackgroundColor3 = Config.Theme.Secondary
 NoclipToggle.TextColor3 = Color3.new(1, 1, 1)
 NoclipToggle.Font = Enum.Font.Gotham
 NoclipToggle.TextSize = 12
+NoclipToggle.TextScaled = false
 local noclipCorner = Instance.new("UICorner", NoclipToggle)
 noclipCorner.CornerRadius = UDim.new(0, 8)
 local noclipStroke = Instance.new("UIStroke", NoclipToggle)
@@ -956,6 +1002,7 @@ FlyToggle.BackgroundColor3 = Config.Theme.Secondary
 FlyToggle.TextColor3 = Color3.new(1, 1, 1)
 FlyToggle.Font = Enum.Font.Gotham
 FlyToggle.TextSize = 12
+FlyToggle.TextScaled = false
 local flyCorner = Instance.new("UICorner", FlyToggle)
 flyCorner.CornerRadius = UDim.new(0, 8)
 local flyStroke = Instance.new("UIStroke", FlyToggle)
@@ -970,6 +1017,7 @@ InfiniteJumpToggle.BackgroundColor3 = Config.Theme.Secondary
 InfiniteJumpToggle.TextColor3 = Color3.new(1, 1, 1)
 InfiniteJumpToggle.Font = Enum.Font.Gotham
 InfiniteJumpToggle.TextSize = 12
+InfiniteJumpToggle.TextScaled = false
 local infiniteJumpCorner = Instance.new("UICorner", InfiniteJumpToggle)
 infiniteJumpCorner.CornerRadius = UDim.new(0, 8)
 local infiniteJumpStroke = Instance.new("UIStroke", InfiniteJumpToggle)
@@ -984,6 +1032,7 @@ FlingButton.BackgroundColor3 = Config.Theme.Secondary
 FlingButton.TextColor3 = Color3.new(1, 1, 1)
 FlingButton.Font = Enum.Font.Gotham
 FlingButton.TextSize = 12
+FlingButton.TextScaled = false
 local flingCorner = Instance.new("UICorner", FlingButton)
 flingCorner.CornerRadius = UDim.new(0, 8)
 local flingStroke = Instance.new("UIStroke", FlingButton)
@@ -998,6 +1047,7 @@ WallWalkToggle.BackgroundColor3 = Config.Theme.Secondary
 WallWalkToggle.TextColor3 = Color3.new(1, 1, 1)
 WallWalkToggle.Font = Enum.Font.Gotham
 WallWalkToggle.TextSize = 12
+WallWalkToggle.TextScaled = false
 local wallWalkCorner = Instance.new("UICorner", WallWalkToggle)
 wallWalkCorner.CornerRadius = UDim.new(0, 8)
 local wallWalkStroke = Instance.new("UIStroke", WallWalkToggle)
@@ -1012,6 +1062,7 @@ WallTPToggle.BackgroundColor3 = Config.Theme.Secondary
 WallTPToggle.TextColor3 = Color3.new(1, 1, 1)
 WallTPToggle.Font = Enum.Font.Gotham
 WallTPToggle.TextSize = 12
+WallTPToggle.TextScaled = false
 local wallTPCorner = Instance.new("UICorner", WallTPToggle)
 wallTPCorner.CornerRadius = UDim.new(0, 8)
 local wallTPStroke = Instance.new("UIStroke", WallTPToggle)
@@ -1026,6 +1077,7 @@ ReduceHitboxToggle.BackgroundColor3 = Config.Theme.Secondary
 ReduceHitboxToggle.TextColor3 = Color3.new(1, 1, 1)
 ReduceHitboxToggle.Font = Enum.Font.Gotham
 ReduceHitboxToggle.TextSize = 12
+ReduceHitboxToggle.TextScaled = false
 local reduceHitboxCorner = Instance.new("UICorner", ReduceHitboxToggle)
 reduceHitboxCorner.CornerRadius = UDim.new(0, 8)
 local reduceHitboxStroke = Instance.new("UIStroke", ReduceHitboxToggle)
@@ -1040,6 +1092,7 @@ XrayToggle.BackgroundColor3 = Config.Theme.Secondary
 XrayToggle.TextColor3 = Color3.new(1, 1, 1)
 XrayToggle.Font = Enum.Font.Gotham
 XrayToggle.TextSize = 12
+XrayToggle.TextScaled = false
 local xrayCorner = Instance.new("UICorner", XrayToggle)
 xrayCorner.CornerRadius = UDim.new(0, 8)
 local xrayStroke = Instance.new("UIStroke", XrayToggle)
@@ -1054,6 +1107,7 @@ InvisibleToggle.BackgroundColor3 = Config.Theme.Secondary
 InvisibleToggle.TextColor3 = Color3.new(1, 1, 1)
 InvisibleToggle.Font = Enum.Font.Gotham
 InvisibleToggle.TextSize = 12
+InvisibleToggle.TextScaled = false
 local invisibleCorner = Instance.new("UICorner", InvisibleToggle)
 invisibleCorner.CornerRadius = UDim.new(0, 8)
 local invisibleStroke = Instance.new("UIStroke", InvisibleToggle)
@@ -1068,6 +1122,7 @@ FlingAuraToggle.BackgroundColor3 = Config.Theme.Secondary
 FlingAuraToggle.TextColor3 = Color3.new(1, 1, 1)
 FlingAuraToggle.Font = Enum.Font.Gotham
 FlingAuraToggle.TextSize = 12
+FlingAuraToggle.TextScaled = false
 local flingAuraCorner = Instance.new("UICorner", FlingAuraToggle)
 flingAuraCorner.CornerRadius = UDim.new(0, 8)
 local flingAuraStroke = Instance.new("UIStroke", FlingAuraToggle)
@@ -1082,6 +1137,7 @@ KillAuraToggle.BackgroundColor3 = Config.Theme.Secondary
 KillAuraToggle.TextColor3 = Color3.new(1, 1, 1)
 KillAuraToggle.Font = Enum.Font.Gotham
 KillAuraToggle.TextSize = 12
+KillAuraToggle.TextScaled = false
 local killAuraCorner = Instance.new("UICorner", KillAuraToggle)
 killAuraCorner.CornerRadius = UDim.new(0, 8)
 local killAuraStroke = Instance.new("UIStroke", KillAuraToggle)
@@ -1096,6 +1152,7 @@ CollectAllExploitButton.BackgroundColor3 = Config.Theme.Secondary
 CollectAllExploitButton.TextColor3 = Color3.new(1, 1, 1)
 CollectAllExploitButton.Font = Enum.Font.Gotham
 CollectAllExploitButton.TextSize = 12
+CollectAllExploitButton.TextScaled = false
 local collectAllCorner = Instance.new("UICorner", CollectAllExploitButton)
 collectAllCorner.CornerRadius = UDim.new(0, 8)
 local collectAllStroke = Instance.new("UIStroke", CollectAllExploitButton)
@@ -1112,34 +1169,22 @@ TeleportToolButton.BackgroundColor3 = Config.Theme.Secondary
 TeleportToolButton.TextColor3 = Color3.new(1, 1, 1)
 TeleportToolButton.Font = Enum.Font.Gotham
 TeleportToolButton.TextSize = 12
+TeleportToolButton.TextScaled = false
 local teleportToolCorner = Instance.new("UICorner", TeleportToolButton)
 teleportToolCorner.CornerRadius = UDim.new(0, 8)
 local teleportToolStroke = Instance.new("UIStroke", TeleportToolButton)
 teleportToolStroke.Color = Config.Theme.Border
 teleportToolStroke.Thickness = 2
 
-local InvisibilityCloakButton = Instance.new("TextButton", ToolsPage)
-InvisibilityCloakButton.Text = "Criar Invisibility Cloak"
-InvisibilityCloakButton.Size = UDim2.new(0, 150, 0, 30)
-InvisibilityCloakButton.Position = UDim2.new(0, 180, 0, 20)
-InvisibilityCloakButton.BackgroundColor3 = Config.Theme.Secondary
-InvisibilityCloakButton.TextColor3 = Color3.new(1, 1, 1)
-InvisibilityCloakButton.Font = Enum.Font.Gotham
-InvisibilityCloakButton.TextSize = 12
-local invisibilityCloakCorner = Instance.new("UICorner", InvisibilityCloakButton)
-invisibilityCloakCorner.CornerRadius = UDim.new(0, 8)
-local invisibilityCloakStroke = Instance.new("UIStroke", InvisibilityCloakButton)
-invisibilityCloakStroke.Color = Config.Theme.Border
-invisibilityCloakStroke.Thickness = 2
-
 local HealthRegenButton = Instance.new("TextButton", ToolsPage)
 HealthRegenButton.Text = "Criar Health Regen"
 HealthRegenButton.Size = UDim2.new(0, 150, 0, 30)
-HealthRegenButton.Position = UDim2.new(0, 20, 0, 60)
+HealthRegenButton.Position = UDim2.new(0, 180, 0, 20)
 HealthRegenButton.BackgroundColor3 = Config.Theme.Secondary
 HealthRegenButton.TextColor3 = Color3.new(1, 1, 1)
 HealthRegenButton.Font = Enum.Font.Gotham
 HealthRegenButton.TextSize = 12
+HealthRegenButton.TextScaled = false
 local healthRegenCorner = Instance.new("UICorner", HealthRegenButton)
 healthRegenCorner.CornerRadius = UDim.new(0, 8)
 local healthRegenStroke = Instance.new("UIStroke", HealthRegenButton)
@@ -1149,11 +1194,12 @@ healthRegenStroke.Thickness = 2
 local CollectAllToolButton = Instance.new("TextButton", ToolsPage)
 CollectAllToolButton.Text = "Criar Collect All Tool"
 CollectAllToolButton.Size = UDim2.new(0, 150, 0, 30)
-CollectAllToolButton.Position = UDim2.new(0, 180, 0, 60)
+CollectAllToolButton.Position = UDim2.new(0, 20, 0, 60)
 CollectAllToolButton.BackgroundColor3 = Config.Theme.Secondary
 CollectAllToolButton.TextColor3 = Color3.new(1, 1, 1)
 CollectAllToolButton.Font = Enum.Font.Gotham
 CollectAllToolButton.TextSize = 12
+CollectAllToolButton.TextScaled = false
 local collectAllToolCorner = Instance.new("UICorner", CollectAllToolButton)
 collectAllToolCorner.CornerRadius = UDim.new(0, 8)
 local collectAllToolStroke = Instance.new("UIStroke", CollectAllToolButton)
@@ -1178,6 +1224,7 @@ local function updateWaypointList()
         waypointButton.TextColor3 = Color3.new(1, 1, 1)
         waypointButton.Font = Enum.Font.Gotham
         waypointButton.TextSize = 12
+        waypointButton.TextScaled = false
         local wpCorner = Instance.new("UICorner", waypointButton)
         wpCorner.CornerRadius = UDim.new(0, 8)
         local wpStroke = Instance.new("UIStroke", waypointButton)
@@ -1191,6 +1238,7 @@ local function updateWaypointList()
         deleteButton.TextColor3 = Color3.new(1, 1, 1)
         deleteButton.Font = Enum.Font.Gotham
         deleteButton.TextSize = 12
+        deleteButton.TextScaled = false
         local delCorner = Instance.new("UICorner", deleteButton)
         delCorner.CornerRadius = UDim.new(0, 8)
         local delStroke = Instance.new("UIStroke", deleteButton)
@@ -1226,6 +1274,7 @@ local function updatePlayerList()
             playerButton.TextColor3 = Color3.new(1, 1, 1)
             playerButton.Font = Enum.Font.Gotham
             playerButton.TextSize = 12
+            playerButton.TextScaled = false
             local plrCorner = Instance.new("UICorner", playerButton)
             plrCorner.CornerRadius = UDim.new(0, 8)
             local plrStroke = Instance.new("UIStroke", playerButton)
@@ -1267,6 +1316,8 @@ setupButtonAnimations(FilterTeamToggle)
 setupButtonAnimations(FilterFriendsToggle)
 setupButtonAnimations(CreateWaypointButton)
 setupButtonAnimations(TeleportButton)
+setupButtonAnimations(SpectateButton)
+setupButtonAnimations(StopSpectateButton)
 setupButtonAnimations(AimbotToggle)
 setupButtonAnimations(StartRecordingButton)
 setupButtonAnimations(PlayReverseButton)
@@ -1284,7 +1335,6 @@ setupButtonAnimations(FlingAuraToggle)
 setupButtonAnimations(KillAuraToggle)
 setupButtonAnimations(CollectAllExploitButton)
 setupButtonAnimations(TeleportToolButton)
-setupButtonAnimations(InvisibilityCloakButton)
 setupButtonAnimations(HealthRegenButton)
 setupButtonAnimations(CollectAllToolButton)
 setupButtonAnimations(MinimizeButton)
@@ -1361,6 +1411,20 @@ TeleportButton.MouseButton1Click:Connect(function()
             showNotification("Erro: Jogador ou waypoint não encontrado")
         end
     end
+end)
+
+SpectateButton.MouseButton1Click:Connect(function()
+    local input = TeleportInput.Text
+    local player = Players:FindFirstChild(input)
+    if player then
+        spectatePlayer(player)
+    else
+        showNotification("Erro: Jogador não encontrado")
+    end
+end)
+
+StopSpectateButton.MouseButton1Click:Connect(function()
+    stopSpectating()
 end)
 
 AimbotToggle.MouseButton1Click:Connect(function()
@@ -1443,8 +1507,7 @@ end)
 
 WallWalkToggle.MouseButton1Click:Connect(function()
     wallWalkEnabled = not wallWalkEnabled
-    WallWalkToggle.Text = wallWalk
-WallWalkToggle.Text = wallWalkEnabled and "Wall Walk: Ativado" or "Wall Walk: Desativado"
+    WallWalkToggle.Text = wallWalkEnabled and "Wall Walk: Ativado" or "Wall Walk: Desativado"
     applyWallWalk(LocalPlayer.Character)
     showNotification("Wall Walk " .. (wallWalkEnabled and "ativado" or "desativado"))
 end)
@@ -1494,10 +1557,6 @@ end)
 
 TeleportToolButton.MouseButton1Click:Connect(function()
     createTeleportTool()
-end)
-
-InvisibilityCloakButton.MouseButton1Click:Connect(function()
-    createInvisibilityCloakTool()
 end)
 
 HealthRegenButton.MouseButton1Click:Connect(function()
